@@ -54,7 +54,7 @@ export async function POST() {
       .insert({
         user_id: user.id,
         steel_session_id: session.id,
-        target_url: "https://www.instagram.com/accounts/login/",
+        target_url: "https://www.instagram.com/",
         status: "pending",
         created_at: new Date().toISOString(),
       });

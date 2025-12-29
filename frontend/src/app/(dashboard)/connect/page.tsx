@@ -406,34 +406,17 @@ export default function ConnectPage() {
                   </p>
                 </div>
                 
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 space-y-4">
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">1</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">In the browser window, paste this URL:</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <code className="bg-black/50 px-3 py-2 rounded text-sm flex-1 text-emerald-400">
-                          instagram.com/accounts/login
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText("https://www.instagram.com/accounts/login/");
-                            toast({ title: "Copied!", description: "URL copied to clipboard" });
-                          }}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                    </div>
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">1</div>
+                    <p className="text-sm">Instagram should be loading in the browser window</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">2</div>
-                    <p className="text-sm">Log in to your Instagram account</p>
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">2</div>
+                    <p className="text-sm">Click &quot;Log in&quot; and sign in to your Instagram account</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">3</div>
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">3</div>
                     <p className="text-sm">Once you see your Instagram feed, come back here and click below</p>
                   </div>
                 </div>
