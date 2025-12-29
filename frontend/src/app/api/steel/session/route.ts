@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = 'force-dynamic';
 
@@ -42,26 +43,36 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Queue session for Mac Mini worker to navigate
-    const { error: queueError } = await supabase.from("steel_session_queue").insert({
-      user_id: user.id,
-      session_id: session.id,
-      status: "pending",
-    });
+    // Store in database for Mac Mini worker to pick up
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    if (queueError) {
-      console.error("Failed to queue session:", queueError);
-      // Continue anyway - we can still show the player
+    const { error: dbError } = await adminClient
+      .from("steel_navigation_queue")
+      .insert({
+        user_id: user.id,
+        steel_session_id: session.id,
+        target_url: "https://www.instagram.com/accounts/login/",
+        status: "pending",
+        created_at: new Date().toISOString(),
+      });
+
+    if (dbError) {
+      console.error("Failed to queue navigation:", dbError);
+      // Continue anyway - return session for manual navigation fallback
+    } else {
+      console.log("Navigation queued for Mac Mini worker");
     }
 
-    // Return the player URL and queue ID for polling
+    // Return session ID - frontend will poll for status
     const liveUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
-    console.log("Live URL:", liveUrl);
 
     return NextResponse.json({
       sessionId: session.id,
       liveViewUrl: liveUrl,
-      queued: !queueError, // Let frontend know if it should poll
+      queued: !dbError, // Tell frontend to poll if queued
     });
   } catch (error) {
     console.error("Steel session error:", error);

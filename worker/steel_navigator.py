@@ -1,70 +1,147 @@
 #!/usr/bin/env python3
 """
-Steel Navigator API
-Runs on Mac Mini to handle Steel browser navigation via Puppeteer
+Steel Navigator Worker - Runs on Mac Mini
+Polls Supabase for pending Steel sessions and navigates them to Instagram using Playwright.
 """
 
 import os
-import subprocess
-import json
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import time
+import asyncio
+from datetime import datetime
+from playwright.async_api import async_playwright
+from supabase import create_client, Client
 from dotenv import load_dotenv
 
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)  # Allow requests from Vercel
-
+# Configuration
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")  # Service role key
 STEEL_API_KEY = os.getenv("STEEL_API_KEY")
+POLL_INTERVAL = 2  # Check every 2 seconds
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"})
+class SteelNavigator:
+    def __init__(self):
+        if not all([SUPABASE_URL, SUPABASE_KEY, STEEL_API_KEY]):
+            raise ValueError("Missing required environment variables: SUPABASE_URL, SUPABASE_KEY, STEEL_API_KEY")
+        
+        self.supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("🚀 Steel Navigator Worker started")
+        print(f"   Polling every {POLL_INTERVAL} seconds...")
 
-@app.route("/navigate", methods=["POST"])
-def navigate():
-    """Navigate a Steel session to Instagram login"""
-    try:
-        data = request.json
-        session_id = data.get("sessionId")
-        
-        if not session_id:
-            return jsonify({"error": "Missing sessionId"}), 400
-        
-        if not STEEL_API_KEY:
-            return jsonify({"error": "STEEL_API_KEY not configured"}), 500
-        
-        # Run the Node.js navigation script
-        script_path = os.path.join(os.path.dirname(__file__), "navigate-steel.js")
-        
-        result = subprocess.run(
-            ["node", script_path, session_id, STEEL_API_KEY],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        
-        # Parse the output
-        try:
-            output = json.loads(result.stdout.strip())
-            if output.get("success"):
-                return jsonify({"success": True, "message": "Navigated to Instagram"})
-            else:
-                return jsonify({"success": False, "error": output.get("error", "Unknown error")}), 500
-        except json.JSONDecodeError:
-            return jsonify({
-                "success": False, 
-                "error": result.stderr or result.stdout or "Script failed"
-            }), 500
+    async def run(self):
+        """Main loop - polls for pending navigation tasks"""
+        while True:
+            try:
+                await self.process_pending_tasks()
+            except Exception as e:
+                print(f"❌ Error in main loop: {e}")
             
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Navigation timed out"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            await asyncio.sleep(POLL_INTERVAL)
+
+    async def process_pending_tasks(self):
+        """Check for and process pending navigation tasks"""
+        try:
+            # Get pending tasks
+            response = self.supabase.table("steel_navigation_queue") \
+                .select("*") \
+                .eq("status", "pending") \
+                .order("created_at") \
+                .limit(1) \
+                .execute()
+
+            if not response.data:
+                return  # No pending tasks
+
+            task = response.data[0]
+            task_id = task["id"]
+            session_id = task["steel_session_id"]
+            target_url = task["target_url"]
+
+            print(f"\n✨ Found pending task: {task_id}")
+            print(f"   Session: {session_id}")
+            print(f"   Target: {target_url}")
+
+            # Mark as navigating
+            self.supabase.table("steel_navigation_queue") \
+                .update({"status": "navigating", "updated_at": datetime.now().isoformat()}) \
+                .eq("id", task_id) \
+                .execute()
+
+            # Navigate
+            success = await self.navigate_session(session_id, target_url)
+
+            if success:
+                # Mark as ready
+                self.supabase.table("steel_navigation_queue") \
+                    .update({"status": "ready", "updated_at": datetime.now().isoformat()}) \
+                    .eq("id", task_id) \
+                    .execute()
+                print(f"✅ Navigation complete! Session ready for user.")
+            else:
+                # Mark as failed
+                self.supabase.table("steel_navigation_queue") \
+                    .update({
+                        "status": "failed",
+                        "error_message": "Navigation failed",
+                        "updated_at": datetime.now().isoformat()
+                    }) \
+                    .eq("id", task_id) \
+                    .execute()
+                print(f"❌ Navigation failed for session {session_id}")
+
+        except Exception as e:
+            print(f"❌ Error processing tasks: {e}")
+
+    async def navigate_session(self, session_id: str, target_url: str) -> bool:
+        """Connect to Steel session and navigate to target URL"""
+        try:
+            async with async_playwright() as p:
+                # Connect to Steel browser via WebSocket
+                ws_url = f"wss://connect.steel.dev?sessionId={session_id}&apiKey={STEEL_API_KEY}"
+                print(f"   Connecting to Steel browser...")
+                
+                browser = await p.chromium.connect_over_cdp(ws_url)
+                
+                # Get the default context and page
+                contexts = browser.contexts
+                if contexts:
+                    context = contexts[0]
+                    pages = context.pages
+                    if pages:
+                        page = pages[0]
+                    else:
+                        page = await context.new_page()
+                else:
+                    context = await browser.new_context()
+                    page = await context.new_page()
+
+                # Navigate to target URL
+                print(f"   Navigating to {target_url}...")
+                await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                
+                # Wait a moment for page to fully load
+                await asyncio.sleep(2)
+                
+                print(f"   ✅ Page loaded: {page.url}")
+                
+                # Don't close the browser - user needs it!
+                # Just disconnect our control
+                
+                return True
+
+        except Exception as e:
+            print(f"   ❌ Navigation error: {e}")
+            return False
+
+
+async def main():
+    navigator = SteelNavigator()
+    await navigator.run()
+
 
 if __name__ == "__main__":
-    port = int(os.getenv("NAVIGATOR_PORT", 5001))
-    print(f"🚀 Steel Navigator running on port {port}")
-    app.run(host="0.0.0.0", port=port, debug=False)
-
+    print("=" * 50)
+    print("Steel Navigator Worker")
+    print("=" * 50)
+    asyncio.run(main())

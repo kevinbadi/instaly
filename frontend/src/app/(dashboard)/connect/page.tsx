@@ -126,6 +126,7 @@ export default function ConnectPage() {
   const handleStartConnection = async () => {
     console.log("Starting connection...");
     setConnecting(true);
+    
     try {
       const response = await fetch("/api/steel/session", {
         method: "POST",
@@ -135,85 +136,82 @@ export default function ConnectPage() {
       const data = await response.json();
       console.log("Response data:", data);
 
-      if (response.ok) {
-        setSteelSessionId(data.sessionId);
-        const browserUrl = data.liveViewUrl;
-        setSteelSessionUrl(browserUrl);
-        
-        // If session is queued for Mac Mini navigation, poll until ready
-        if (data.queued) {
-          toast({
-            title: "Preparing browser...",
-            description: "Please wait while we load Instagram for you.",
-          });
-          
-          // Poll for navigation status
-          let attempts = 0;
-          const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds max
-          
-          const pollStatus = async (): Promise<boolean> => {
-            const statusRes = await fetch(`/api/steel/status?sessionId=${data.sessionId}`);
-            const statusData = await statusRes.json();
-            console.log("Session status:", statusData.status);
-            
-            if (statusData.status === "ready") {
-              return true;
-            } else if (statusData.status === "failed" || statusData.status === "manual") {
-              return false; // Will show manual instructions
-            }
-            return false; // Still pending/navigating
-          };
-          
-          // Poll until ready or timeout
-          while (attempts < maxAttempts) {
-            const ready = await pollStatus();
-            if (ready) {
-              // Navigation complete! Open the browser
-              const steelWindow = window.open(browserUrl, "_blank", "width=1200,height=800");
-              if (!steelWindow) {
-                toast({
-                  title: "Pop-up blocked",
-                  description: "Please allow pop-ups and try again.",
-                  variant: "destructive",
-                });
-                return;
-              }
-              toast({
-                title: "Instagram loaded!",
-                description: "Log in to your account, then come back here.",
-              });
-              setConnecting(false);
-              return;
-            }
-            attempts++;
-            await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
-          }
-          
-          // Timeout - show browser anyway with manual instructions
-          console.log("Navigation timeout, showing manual instructions");
-        }
-        
-        // Open browser (manual navigation needed)
-        const steelWindow = window.open(browserUrl, "_blank", "width=1200,height=800");
-        
-        if (!steelWindow) {
-          toast({
-            title: "Pop-up blocked",
-            description: "Please allow pop-ups and try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        toast({
-          title: "Browser opened",
-          description: "Navigate to Instagram and log in.",
-        });
-      } else {
+      if (!response.ok) {
         toast({
           title: "Error",
           description: data.error || "Failed to start connection. Please try again.",
           variant: "destructive",
+        });
+        setConnecting(false);
+        return;
+      }
+
+      setSteelSessionId(data.sessionId);
+      setSteelSessionUrl(data.liveViewUrl);
+
+      // If queued for Mac Mini navigation, poll until ready
+      if (data.queued) {
+        toast({
+          title: "Preparing browser...",
+          description: "Loading Instagram login page. This takes a few seconds.",
+        });
+
+        // Poll for navigation completion
+        let attempts = 0;
+        const maxAttempts = 30; // 60 seconds max (30 * 2s)
+
+        while (attempts < maxAttempts) {
+          await new Promise(r => setTimeout(r, 2000));
+          
+          try {
+            const statusRes = await fetch(`/api/steel/status?sessionId=${data.sessionId}`);
+            const statusData = await statusRes.json();
+            console.log("Navigation status:", statusData.status);
+
+            if (statusData.status === "ready") {
+              // Navigation complete! Open browser
+              const steelWindow = window.open(data.liveViewUrl, "_blank", "width=1200,height=800");
+              if (!steelWindow) {
+                toast({
+                  title: "Pop-up blocked",
+                  description: "Please allow pop-ups and click 'Re-open Browser Window'.",
+                  variant: "destructive",
+                });
+              } else {
+                toast({
+                  title: "Instagram loaded!",
+                  description: "Log in to your account, then come back here.",
+                });
+              }
+              setConnecting(false);
+              return;
+            } else if (statusData.status === "failed") {
+              // Fall through to manual mode
+              break;
+            }
+          } catch (e) {
+            console.error("Status poll error:", e);
+          }
+          
+          attempts++;
+        }
+
+        // Timeout or failed - open anyway with manual instructions
+        console.log("Navigation timeout/failed, opening for manual navigation");
+      }
+
+      // Open browser (manual navigation needed or fallback)
+      const steelWindow = window.open(data.liveViewUrl, "_blank", "width=1200,height=800");
+      if (!steelWindow) {
+        toast({
+          title: "Pop-up blocked",
+          description: "Please allow pop-ups and try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Browser opened",
+          description: "Navigate to instagram.com/accounts/login and log in.",
         });
       }
     } catch (error) {
@@ -399,44 +397,27 @@ export default function ConnectPage() {
             ) : (
               <div className="space-y-6 py-4">
                 <div className="text-center">
-                  <div className="h-16 w-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
-                    <AlertCircle className="h-8 w-8 text-yellow-500" />
+                  <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                    <Instagram className="h-8 w-8 text-emerald-500" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">Browser Opened - Action Required</h3>
+                  <h3 className="text-xl font-semibold mb-2">Instagram Login Ready</h3>
                   <p className="text-muted-foreground max-w-md mx-auto">
-                    A browser window opened. Follow the steps below to connect your account.
+                    A browser window opened with Instagram&apos;s login page.
                   </p>
                 </div>
                 
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 space-y-4">
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">1</div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">In the browser window, click the URL bar and paste this:</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <code className="bg-black/50 px-3 py-2 rounded text-sm flex-1 text-emerald-400">
-                          instagram.com/accounts/login
-                        </code>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            navigator.clipboard.writeText("https://www.instagram.com/accounts/login/");
-                            toast({ title: "Copied!", description: "URL copied to clipboard" });
-                          }}
-                        >
-                          Copy
-                        </Button>
-                      </div>
-                    </div>
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">1</div>
+                    <p className="text-sm">Log in to your Instagram account in the browser window</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">2</div>
-                    <p className="text-sm">Press Enter, then log in to your Instagram account</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">3</div>
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">2</div>
                     <p className="text-sm">Once you see your Instagram feed, come back here</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">3</div>
+                    <p className="text-sm">Click the button below to capture your session</p>
                   </div>
                 </div>
                 
