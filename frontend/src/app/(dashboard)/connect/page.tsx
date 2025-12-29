@@ -137,12 +137,23 @@ export default function ConnectPage() {
 
       if (response.ok) {
         setSteelSessionId(data.sessionId);
-        // Use sessionViewerUrl for the iframe
         setSteelSessionUrl(data.liveViewUrl);
         
+        // Open in new window - bypasses iframe restrictions
+        const steelWindow = window.open(data.liveViewUrl, "_blank", "width=1200,height=800");
+        
+        if (!steelWindow) {
+          toast({
+            title: "Pop-up blocked",
+            description: "Please allow pop-ups and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         toast({
-          title: "Browser ready!",
-          description: "Log in to Instagram in the browser below.",
+          title: "Browser opened!",
+          description: "Log in to Instagram in the new window, then come back here and click 'Capture Session'.",
         });
       } else {
         toast({
@@ -333,25 +344,46 @@ export default function ConnectPage() {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-sm">
-                  <strong>Log in to Instagram</strong> in the browser below, then click &quot;Capture Session&quot; when done.
-                </div>
-                <div className="bg-black rounded-lg overflow-hidden border" style={{ height: "550px" }}>
-                  <iframe
-                    src={steelSessionUrl}
-                    className="w-full h-full"
-                    title="Instagram Login"
-                    allow="clipboard-read; clipboard-write"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    After logging in to Instagram, click the button to capture your session.
+              <div className="space-y-6 py-4">
+                <div className="text-center">
+                  <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">Browser Opened!</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    A new window has opened with the Instagram login page. 
+                    Log in to your account there, then come back here.
                   </p>
-                  <Button variant="gradient" onClick={handleCaptureSession}>
+                </div>
+                
+                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">1</div>
+                    <p className="text-sm">Log in to Instagram in the new browser window</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">2</div>
+                    <p className="text-sm">Make sure you see your Instagram feed (you&apos;re logged in)</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">3</div>
+                    <p className="text-sm">Come back here and click the button below</p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-3">
+                  <Button variant="gradient" size="lg" className="w-full" onClick={handleCaptureSession}>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     I&apos;m Logged In - Capture Session
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => window.open(steelSessionUrl, "_blank")}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Re-open Browser Window
                   </Button>
                 </div>
               </div>
