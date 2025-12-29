@@ -297,16 +297,15 @@ export default function ConnectPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-        <div className="grid gap-4">
-          {[1, 2].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-20 bg-muted rounded" />
-              </CardContent>
-            </Card>
-          ))}
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-4 border-white/10 border-t-emerald-500 animate-spin mx-auto" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-emerald-500/20" />
+            </div>
+          </div>
+          <p className="text-muted-foreground mt-4 animate-pulse">Loading accounts...</p>
         </div>
       </div>
     );

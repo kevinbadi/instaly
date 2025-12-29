@@ -319,15 +319,15 @@ export default function LeadsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-16 bg-muted rounded" />
-              </CardContent>
-            </Card>
-          ))}
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-4 border-white/10 border-t-emerald-500 animate-spin mx-auto" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-emerald-500/20" />
+            </div>
+          </div>
+          <p className="text-muted-foreground mt-4 animate-pulse">Loading leads...</p>
         </div>
       </div>
     );
