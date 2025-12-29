@@ -765,13 +765,26 @@ class InstagramDMAgent:
         
         except KeyboardInterrupt:
             self.log("\n⛔ Interrupted", "warning")
+        except BrokenPipeError:
+            self.log("Browser connection lost (EPIPE). Session may have expired.", "error")
         except Exception as e:
-            self.log(f"Unexpected error: {e}", "error")
+            error_str = str(e).lower()
+            if "epipe" in error_str or "broken pipe" in error_str:
+                self.log("Browser connection lost. Session may have expired.", "error")
+            else:
+                self.log(f"Unexpected error: {e}", "error")
         finally:
-            if self.browser:
-                self.browser.close()
-            if self.playwright:
-                self.playwright.stop()
+            # Safely close browser - ignore errors during cleanup
+            try:
+                if self.browser:
+                    self.browser.close()
+            except Exception:
+                pass  # Browser may already be closed
+            try:
+                if self.playwright:
+                    self.playwright.stop()
+            except Exception:
+                pass  # Playwright may already be stopped
 
 
 def main():
