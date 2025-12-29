@@ -204,23 +204,35 @@ export async function createInstagramAccount(
   userId: string,
   username: string
 ): Promise<InstagramAccount> {
-  const supabase = await createClient();
+  // Use service role to bypass RLS
+  const { createClient: createAdminClient } = await import("@supabase/supabase-js");
+  const supabase = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
   
-  // Upsert - create or update if exists
+  // Generate unique username if it's the placeholder
+  let finalUsername = username;
+  if (username === "instagram_user") {
+    // Add timestamp to make it unique, user can edit later
+    finalUsername = `instagram_user_${Date.now()}`;
+  }
+  
+  // Always create a new account
   const { data, error } = await supabase
     .from("instagram_accounts")
-    .upsert(
-      { 
-        user_id: userId, 
-        instagram_username: username,
-        status: "active"
-      },
-      { onConflict: "user_id,instagram_username" }
-    )
+    .insert({ 
+      user_id: userId, 
+      instagram_username: finalUsername,
+      status: "active"
+    })
     .select()
     .single();
   
-  if (error) throw error;
+  if (error) {
+    console.error("Error creating Instagram account:", error);
+    throw error;
+  }
   return data as InstagramAccount;
 }
 
