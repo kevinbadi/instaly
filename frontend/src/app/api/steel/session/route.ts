@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = 'force-dynamic';
 
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
-const NAVIGATOR_URL = process.env.NAVIGATOR_URL; // Mac Mini endpoint
 
 export async function POST() {
   console.log("Steel session POST called");
@@ -43,31 +42,7 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Call Mac Mini to navigate the browser to Instagram
-    if (NAVIGATOR_URL) {
-      console.log("Calling Mac Mini navigator at:", NAVIGATOR_URL);
-      try {
-        const navResponse = await fetch(`${NAVIGATOR_URL}/navigate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: session.id }),
-        });
-        
-        const navResult = await navResponse.json();
-        console.log("Navigator result:", navResult);
-        
-        if (!navResult.success) {
-          console.warn("Navigation failed but continuing:", navResult.error);
-        }
-      } catch (navErr) {
-        console.warn("Could not reach Mac Mini navigator:", navErr);
-        // Continue anyway - user can navigate manually
-      }
-    } else {
-      console.warn("NAVIGATOR_URL not set - user will need to navigate manually");
-    }
-
-    // Return the player URL
+    // Return the player URL - user will navigate manually
     const liveUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
     console.log("Live URL:", liveUrl);
 

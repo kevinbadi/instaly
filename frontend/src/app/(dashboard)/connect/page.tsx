@@ -350,28 +350,44 @@ export default function ConnectPage() {
             ) : (
               <div className="space-y-6 py-4">
                 <div className="text-center">
-                  <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                  <div className="h-16 w-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+                    <AlertCircle className="h-8 w-8 text-yellow-500" />
                   </div>
-                  <h3 className="text-xl font-semibold mb-2">Browser Opened!</h3>
+                  <h3 className="text-xl font-semibold mb-2">Browser Opened - Action Required</h3>
                   <p className="text-muted-foreground max-w-md mx-auto">
-                    A new window has opened with the Instagram login page. 
-                    Log in to your account there, then come back here.
+                    A browser window opened. Follow the steps below to connect your account.
                   </p>
                 </div>
                 
-                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">1</div>
-                    <p className="text-sm">Log in to Instagram in the new browser window</p>
+                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">1</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">In the browser window, click the URL bar and paste this:</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <code className="bg-black/50 px-3 py-2 rounded text-sm flex-1 text-emerald-400">
+                          instagram.com/accounts/login
+                        </code>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            navigator.clipboard.writeText("https://www.instagram.com/accounts/login/");
+                            toast({ title: "Copied!", description: "URL copied to clipboard" });
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">2</div>
-                    <p className="text-sm">Make sure you see your Instagram feed (you&apos;re logged in)</p>
+                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">2</div>
+                    <p className="text-sm">Press Enter, then log in to your Instagram account</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-sm font-bold shrink-0">3</div>
-                    <p className="text-sm">Come back here and click the button below</p>
+                    <div className="h-6 w-6 rounded-full bg-yellow-500 text-black flex items-center justify-center text-sm font-bold shrink-0">3</div>
+                    <p className="text-sm">Once you see your Instagram feed, come back here</p>
                   </div>
                 </div>
                 
