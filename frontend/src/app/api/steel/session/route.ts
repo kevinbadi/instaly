@@ -45,17 +45,25 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", JSON.stringify(session));
 
+    // Log full session response for debugging
+    console.log("Full session response:", JSON.stringify(session, null, 2));
+
     // Get the session viewer URL from the response
-    // Steel returns sessionViewerUrl or we construct it
-    const sessionViewerUrl = session.sessionViewerUrl || 
+    // Steel might return different URL fields
+    const sessionViewerUrl = session.sessionViewerUrl || session.liveUrl || session.viewerUrl ||
                              `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
     
+    // Also construct a URL with the target page encoded
+    const playerWithUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true&url=${encodeURIComponent("https://www.instagram.com/accounts/login/")}`;
+    
     console.log("Session viewer URL:", sessionViewerUrl);
+    console.log("Player with URL:", playerWithUrl);
 
     return NextResponse.json({
       sessionId: session.id,
-      liveViewUrl: sessionViewerUrl,
+      liveViewUrl: playerWithUrl, // Try with URL parameter
       debugUrl: session.debugUrl,
+      wsEndpoint: session.websocketUrl || `wss://connect.steel.dev?sessionId=${session.id}&apiKey=${STEEL_API_KEY}`,
     });
   } catch (error) {
     console.error("Steel session error:", error);
