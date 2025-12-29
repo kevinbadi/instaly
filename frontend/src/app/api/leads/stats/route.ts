@@ -14,31 +14,31 @@ export async function GET() {
     const dbUser = await getOrCreateUser(user.id, user.email!, user.user_metadata?.full_name);
 
     // Get total leads
-    const { count: total } = await supabase
+    const { data: totalData } = await supabase
       .from("leads")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("user_id", dbUser.id);
 
     // Get unassigned leads (no campaign)
-    const { count: unassigned } = await supabase
+    const { data: unassignedData } = await supabase
       .from("leads")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("user_id", dbUser.id)
       .is("campaign_id", null)
       .eq("dm_sent", false);
 
     // Get pending leads (assigned but not sent)
-    const { count: pending } = await supabase
+    const { data: pendingData } = await supabase
       .from("leads")
-      .select("*", { count: "exact", head: true })
+      .select("id")
       .eq("user_id", dbUser.id)
       .not("campaign_id", "is", null)
       .eq("dm_sent", false);
 
     return NextResponse.json({
-      total: total || 0,
-      unassigned: unassigned || 0,
-      pending: pending || 0,
+      total: totalData?.length || 0,
+      unassigned: unassignedData?.length || 0,
+      pending: pendingData?.length || 0,
     });
   } catch (error) {
     console.error("Lead stats error:", error);

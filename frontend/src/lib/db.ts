@@ -330,21 +330,24 @@ export async function getLeadStats(userId: string): Promise<{
 }> {
   const supabase = await createClient();
   
-  const { count: total } = await supabase
+  const { data: totalData } = await supabase
     .from("leads")
-    .select("*", { count: "exact", head: true })
+    .select("id")
     .eq("user_id", userId);
   
-  const { count: messaged } = await supabase
+  const { data: messagedData } = await supabase
     .from("leads")
-    .select("*", { count: "exact", head: true })
+    .select("id")
     .eq("user_id", userId)
     .eq("dm_sent", true);
   
+  const total = totalData?.length || 0;
+  const messaged = messagedData?.length || 0;
+  
   return {
-    total: total || 0,
-    messaged: messaged || 0,
-    pending: (total || 0) - (messaged || 0),
+    total,
+    messaged,
+    pending: total - messaged,
   };
 }
 
@@ -367,9 +370,9 @@ export async function getDmsSentToday(userId: string): Promise<number> {
   const accountIds = accounts.map(a => a.id);
   
   // Count actual DMs sent in last 24 hours from dm_logs for these accounts
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from("dm_logs")
-    .select("*", { count: "exact", head: true })
+    .select("id")
     .in("instagram_account_id", accountIds)
     .eq("status", "sent")
     .gte("sent_at", twentyFourHoursAgo.toISOString());
@@ -377,13 +380,13 @@ export async function getDmsSentToday(userId: string): Promise<number> {
   if (error) {
     console.error("Error fetching DMs sent today:", error);
     // Fallback to instagram_accounts dms_sent_today
-    const { data } = await supabase
+    const { data: fallbackData } = await supabase
       .from("instagram_accounts")
       .select("dms_sent_today")
       .eq("user_id", userId);
     
-    return (data || []).reduce((sum, acc) => sum + (acc.dms_sent_today || 0), 0);
+    return (fallbackData || []).reduce((sum, acc) => sum + (acc.dms_sent_today || 0), 0);
   }
   
-  return count || 0;
+  return data?.length || 0;
 }

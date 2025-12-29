@@ -43,25 +43,25 @@ export async function POST(
 
     if (assignAll) {
       // Assign all unassigned, unsent leads to this campaign
-      const { count } = await supabase
+      const { data } = await supabase
         .from("leads")
         .update({ campaign_id: campaignId })
         .eq("user_id", dbUser.id)
         .is("campaign_id", null)
         .eq("dm_sent", false)
-        .select("*", { count: "exact", head: true });
+        .select("id");
       
-      updated = count || 0;
+      updated = data?.length || 0;
     } else if (leadIds && Array.isArray(leadIds)) {
       // Assign specific leads
-      const { count } = await supabase
+      const { data } = await supabase
         .from("leads")
         .update({ campaign_id: campaignId })
         .eq("user_id", dbUser.id)
         .in("id", leadIds)
-        .select("*", { count: "exact", head: true });
+        .select("id");
       
-      updated = count || 0;
+      updated = data?.length || 0;
     }
 
     return NextResponse.json({

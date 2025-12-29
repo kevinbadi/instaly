@@ -17,14 +17,14 @@ export async function GET() {
     // Get leads count for each campaign
     const campaignsWithLeads = await Promise.all(
       campaigns.map(async (campaign) => {
-        const { count } = await supabase
+        const { data } = await supabase
           .from("leads")
-          .select("*", { count: "exact", head: true })
+          .select("id")
           .eq("campaign_id", campaign.id);
         
         return {
           ...campaign,
-          leads_count: count || 0,
+          leads_count: data?.length || 0,
         };
       })
     );
