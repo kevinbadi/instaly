@@ -76,7 +76,6 @@ export default function LeadsPage() {
   const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
   const [scrapeUrl, setScrapeUrl] = useState("");
   const [scraping, setScraping] = useState(false);
-  const [scrapeJobId, setScrapeJobId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -182,80 +181,30 @@ export default function LeadsPage() {
 
       const data = await response.json();
 
-      if (response.ok) {
-        setScrapeJobId(data.scrapeJobId);
+      if (response.ok && data.success) {
         toast({
-          title: "Scraping started!",
-          description: "We're scraping leads from the post. This may take a few minutes.",
+          title: "Scraping complete!",
+          description: `Found ${data.leadsScraped || 0} new leads.`,
         });
-
-        // Poll for completion
-        pollScrapeStatus(data.scrapeJobId);
+        setScrapeDialogOpen(false);
+        setScrapeUrl("");
+        fetchData(); // Refresh leads list
       } else {
         toast({
-          title: "Error",
-          description: data.error || "Failed to start scraping",
+          title: "Scraping failed",
+          description: data.error || "Failed to scrape leads",
           variant: "destructive",
         });
-        setScraping(false);
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to start scraping",
+        description: "Failed to scrape leads. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setScraping(false);
     }
-  };
-
-  const pollScrapeStatus = async (jobId: string) => {
-    const maxAttempts = 60; // 5 minutes with 5 second intervals
-    let attempts = 0;
-
-    const poll = async () => {
-      attempts++;
-      try {
-        const response = await fetch(`/api/leads/scrape?jobId=${jobId}`);
-        const data = await response.json();
-
-        if (data.status === "completed") {
-          toast({
-            title: "Scraping complete!",
-            description: `Found ${data.leadsScraped || 0} new leads.`,
-          });
-          setScraping(false);
-          setScrapeDialogOpen(false);
-          setScrapeUrl("");
-          setScrapeJobId(null);
-          fetchData();
-        } else if (data.status === "failed") {
-          toast({
-            title: "Scraping failed",
-            description: data.error || "Unknown error",
-            variant: "destructive",
-          });
-          setScraping(false);
-          setScrapeJobId(null);
-        } else if (attempts < maxAttempts) {
-          setTimeout(poll, 5000);
-        } else {
-          toast({
-            title: "Scraping timed out",
-            description: "The scrape is taking too long. Check back later.",
-            variant: "destructive",
-          });
-          setScraping(false);
-          setScrapeJobId(null);
-        }
-      } catch (error) {
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 5000);
-        }
-      }
-    };
-
-    setTimeout(poll, 5000);
   };
 
   const handleDeleteLead = async (leadId: string) => {
@@ -384,7 +333,7 @@ export default function LeadsPage() {
                     <div>
                       <p className="font-medium">Scraping in progress...</p>
                       <p className="text-sm text-muted-foreground">
-                        This may take 2-5 minutes. You can close this dialog.
+                        This may take 1-3 minutes. Please wait...
                       </p>
                     </div>
                   </div>

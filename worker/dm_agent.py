@@ -613,10 +613,11 @@ class InstagramDMAgent:
             return []
     
     def update_lead_status(self, lead_id: str, message: str, success: bool, error: str = None):
-        """Update lead status in database"""
+        """Update lead status in database - always mark as sent to skip on future runs"""
         try:
+            # Always mark as dm_sent=True so we don't retry failed leads forever
             update_data = {
-                "dm_sent": success,
+                "dm_sent": True,  # Mark as processed regardless of success/failure
                 "dm_sent_at": datetime.now().isoformat() if success else None,
             }
             

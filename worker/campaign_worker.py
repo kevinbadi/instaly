@@ -15,7 +15,7 @@ import os
 import time
 import argparse
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
@@ -115,7 +115,9 @@ class CampaignWorker:
                                 tz = frac_and_tz[tz_start:]
                                 next_run_str = f"{parts[0]}.{frac}{tz}"
                         next_run_dt = datetime.fromisoformat(next_run_str)
-                        if next_run_dt > datetime.now(next_run_dt.tzinfo):
+                        # Compare in UTC to avoid timezone issues
+                        now_utc = datetime.now(timezone.utc)
+                        if next_run_dt > now_utc:
                             self.log(f"   ⏳ Campaign '{campaign['name']}' in cooldown until {next_run}", "info")
                             continue
                     except Exception as parse_err:
@@ -170,9 +172,9 @@ class CampaignWorker:
             return True
         
         try:
-            # Update campaign to show it's running
+            # Update campaign to show it's running (use UTC)
             self.supabase.table("campaigns").update({
-                "last_run_at": datetime.now().isoformat()
+                "last_run_at": datetime.now(timezone.utc).isoformat()
             }).eq("id", campaign_id).execute()
             
             # Create and run DM agent for this campaign
@@ -187,8 +189,8 @@ class CampaignWorker:
             # Run the agent
             agent.run()
             
-            # Set next run time (cooldown)
-            next_run = datetime.now() + timedelta(minutes=COOLDOWN_MINUTES)
+            # Set next run time (cooldown) - use UTC for consistency
+            next_run = datetime.now(timezone.utc) + timedelta(minutes=COOLDOWN_MINUTES)
             self.supabase.table("campaigns").update({
                 "next_run_at": next_run.isoformat()
             }).eq("id", campaign_id).execute()
@@ -206,7 +208,7 @@ class CampaignWorker:
             
             # Set retry time (shorter cooldown for failed campaigns)
             try:
-                next_run = datetime.now() + timedelta(minutes=5)
+                next_run = datetime.now(timezone.utc) + timedelta(minutes=5)
                 self.supabase.table("campaigns").update({
                     "next_run_at": next_run.isoformat()
                 }).eq("id", campaign_id).execute()

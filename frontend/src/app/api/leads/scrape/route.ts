@@ -9,16 +9,6 @@ const PHANTOMBUSTER_AGENT_ID = process.env.PHANTOMBUSTER_AGENT_ID;
 
 const PB_BASE_URL = "https://api.phantombuster.com/api/v2";
 
-interface ScrapeStatus {
-  status: "idle" | "running" | "completed" | "failed";
-  containerId?: string;
-  leadsScraped?: number;
-  error?: string;
-}
-
-// In-memory store for scrape status (in production, use Redis or database)
-const scrapeStatusMap = new Map<string, ScrapeStatus>();
-
 export async function POST(request: NextRequest) {
   console.log("=== SCRAPE API CALLED ===");
   console.log("Environment check:");
@@ -173,26 +163,28 @@ export async function POST(request: NextRequest) {
 
     console.log("PhantomBuster container launched:", containerId);
 
-    // Store scrape job info
-    const scrapeJobId = `${dbUser.id}_${Date.now()}`;
-    scrapeStatusMap.set(scrapeJobId, {
-      status: "running",
-      containerId,
-    });
-
-    // Start background polling (don't await)
-    pollAndStoreResults(
-      scrapeJobId,
+    // Wait for PhantomBuster to complete and store results
+    // (Vercel serverless doesn't support background tasks)
+    console.log("Waiting for PhantomBuster to complete...");
+    
+    const result = await waitForCompletionAndStore(
       containerId,
       dbUser.id,
       campaignId,
       postUrl
     );
 
+    if (result.error) {
+      return NextResponse.json({
+        success: false,
+        error: result.error,
+      }, { status: 500 });
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Scraping started",
-      scrapeJobId,
+      message: "Scraping completed",
+      leadsScraped: result.leadsScraped,
       containerId,
     });
   } catch (error) {
@@ -204,65 +196,25 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET endpoint to check scrape status
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const searchParams = request.nextUrl.searchParams;
-    const scrapeJobId = searchParams.get("jobId");
-
-    if (!scrapeJobId) {
-      return NextResponse.json(
-        { error: "Job ID required" },
-        { status: 400 }
-      );
-    }
-
-    const status = scrapeStatusMap.get(scrapeJobId);
-
-    if (!status) {
-      return NextResponse.json(
-        { error: "Job not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(status);
-  } catch (error) {
-    console.error("Status check error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-// Background function to poll PhantomBuster and store results
-async function pollAndStoreResults(
-  scrapeJobId: string,
+// Synchronous function to wait for PhantomBuster completion and store results
+async function waitForCompletionAndStore(
   containerId: string,
   userId: string,
   campaignId: string | undefined,
   postUrl: string
-) {
-  const maxWaitTime = 300000; // 5 minutes
-  const pollInterval = 10000; // 10 seconds
+): Promise<{ leadsScraped?: number; error?: string }> {
+  const maxWaitTime = 180000; // 3 minutes (Vercel timeout is ~5min for Pro)
+  const pollInterval = 5000; // 5 seconds
   const startTime = Date.now();
 
-  console.log(`[Poll] Starting poll for job ${scrapeJobId}, container ${containerId}`);
+  console.log(`[Scrape] Waiting for container ${containerId} to complete...`);
 
   try {
-    // Wait for completion
     while (Date.now() - startTime < maxWaitTime) {
       await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-      console.log(`[Poll] Checking container ${containerId} status...`);
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[Scrape] Checking status... (${elapsed}s elapsed)`);
 
       const statusResponse = await fetch(
         `${PB_BASE_URL}/containers/fetch?id=${containerId}`,
@@ -274,16 +226,15 @@ async function pollAndStoreResults(
       );
 
       if (!statusResponse.ok) {
-        console.log(`[Poll] Status check failed: ${statusResponse.status}`);
+        console.log(`[Scrape] Status check failed: ${statusResponse.status}`);
         continue;
       }
 
       const statusData = await statusResponse.json();
-      console.log(`[Poll] Container status: ${statusData.status}`);
+      console.log(`[Scrape] Container status: ${statusData.status}`);
       
       if (statusData.status === "finished") {
-        // Fetch output to get the S3 URL
-        console.log(`[Poll] Container finished, fetching output...`);
+        console.log(`[Scrape] Container finished, fetching output...`);
         
         const outputResponse = await fetch(
           `${PB_BASE_URL}/agents/fetch-output?id=${PHANTOMBUSTER_AGENT_ID}`,
@@ -294,85 +245,51 @@ async function pollAndStoreResults(
           }
         );
 
-        if (outputResponse.ok) {
-          const outputData = await outputResponse.json();
-          console.log(`[Poll] Output fetched, parsing for S3 URL...`);
-          
-          // Extract the JSON S3 URL from the output
-          const output = outputData.output || "";
-          const jsonUrlMatch = output.match(/https:\/\/phantombuster\.s3\.amazonaws\.com\/[^\s]+result\.json/);
-          
-          if (jsonUrlMatch) {
-            const jsonUrl = jsonUrlMatch[0];
-            console.log(`[Poll] Fetching results from S3: ${jsonUrl}`);
-            
-            // Fetch the actual results from S3
-            const s3Response = await fetch(jsonUrl);
-            if (s3Response.ok) {
-              const leads = await s3Response.json();
-              console.log(`[Poll] Got ${leads.length} leads from S3`);
-              
-              if (Array.isArray(leads) && leads.length > 0) {
-                // Store leads in database
-                const storedCount = await storeLeads(leads, userId, campaignId, postUrl);
-                console.log(`[Poll] Stored ${storedCount} leads in database`);
-                
-                scrapeStatusMap.set(scrapeJobId, {
-                  status: "completed",
-                  containerId,
-                  leadsScraped: storedCount,
-                });
-              } else {
-                scrapeStatusMap.set(scrapeJobId, {
-                  status: "completed",
-                  containerId,
-                  leadsScraped: 0,
-                });
-              }
-            } else {
-              console.error(`[Poll] Failed to fetch S3 results: ${s3Response.status}`);
-              scrapeStatusMap.set(scrapeJobId, {
-                status: "completed",
-                containerId,
-                leadsScraped: 0,
-                error: "Failed to fetch results from S3",
-              });
-            }
-          } else {
-            console.log(`[Poll] No JSON URL found in output`);
-            scrapeStatusMap.set(scrapeJobId, {
-              status: "completed",
-              containerId,
-              leadsScraped: 0,
-            });
-          }
+        if (!outputResponse.ok) {
+          return { error: "Failed to fetch scrape output" };
         }
-        return;
+
+        const outputData = await outputResponse.json();
+        const output = outputData.output || "";
+        
+        // Extract the JSON S3 URL from the output
+        const jsonUrlMatch = output.match(/https:\/\/phantombuster\.s3\.amazonaws\.com\/[^\s]+result\.json/);
+        
+        if (!jsonUrlMatch) {
+          console.log(`[Scrape] No JSON URL found in output`);
+          return { leadsScraped: 0 };
+        }
+
+        const jsonUrl = jsonUrlMatch[0];
+        console.log(`[Scrape] Fetching results from S3: ${jsonUrl}`);
+        
+        const s3Response = await fetch(jsonUrl);
+        if (!s3Response.ok) {
+          return { error: "Failed to fetch results from S3" };
+        }
+
+        const leads = await s3Response.json();
+        console.log(`[Scrape] Got ${leads.length} leads from S3`);
+        
+        if (Array.isArray(leads) && leads.length > 0) {
+          const storedCount = await storeLeads(leads, userId, campaignId, postUrl);
+          console.log(`[Scrape] Stored ${storedCount} leads in database`);
+          return { leadsScraped: storedCount };
+        }
+        
+        return { leadsScraped: 0 };
+        
       } else if (statusData.status === "error") {
-        console.error(`[Poll] Container error: ${statusData.error}`);
-        scrapeStatusMap.set(scrapeJobId, {
-          status: "failed",
-          containerId,
-          error: statusData.error || "Scrape failed",
-        });
-        return;
+        return { error: statusData.error || "Scrape failed" };
       }
+      // Still running, continue polling
     }
 
-    // Timeout
-    console.error(`[Poll] Scrape timed out after ${maxWaitTime}ms`);
-    scrapeStatusMap.set(scrapeJobId, {
-      status: "failed",
-      containerId,
-      error: "Scrape timed out",
-    });
+    return { error: "Scrape timed out after 3 minutes" };
+    
   } catch (error) {
-    console.error("[Poll] Error:", error);
-    scrapeStatusMap.set(scrapeJobId, {
-      status: "failed",
-      containerId,
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    console.error("[Scrape] Error:", error);
+    return { error: error instanceof Error ? error.message : "Unknown error" };
   }
 }
 
