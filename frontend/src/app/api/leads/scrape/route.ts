@@ -21,10 +21,12 @@ const scrapeStatusMap = new Map<string, ScrapeStatus>();
 
 export async function POST(request: NextRequest) {
   console.log("=== SCRAPE API CALLED ===");
-  console.log("PHANTOMBUSTER_API_KEY:", PHANTOMBUSTER_API_KEY ? "SET" : "NOT SET");
-  console.log("PHANTOMBUSTER_AGENT_ID:", PHANTOMBUSTER_AGENT_ID);
-  console.log("SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "SET" : "NOT SET");
-  console.log("SUPABASE_ANON_KEY:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "SET" : "NOT SET");
+  console.log("Environment check:");
+  console.log("- PHANTOMBUSTER_API_KEY:", PHANTOMBUSTER_API_KEY ? "SET (" + PHANTOMBUSTER_API_KEY.substring(0, 5) + "...)" : "NOT SET");
+  console.log("- PHANTOMBUSTER_AGENT_ID:", PHANTOMBUSTER_AGENT_ID || "NOT SET");
+  console.log("- SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "SET" : "NOT SET");
+  console.log("- SUPABASE_ANON_KEY:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "SET" : "NOT SET");
+  console.log("- SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "SET" : "NOT SET");
   
   try {
     let supabase;
@@ -83,10 +85,20 @@ export async function POST(request: NextRequest) {
 
     let dbUser;
     try {
+      console.log("Getting/creating user in DB...");
       dbUser = await getOrCreateUser(user.id, user.email || "", user.user_metadata?.full_name);
-    } catch (dbError) {
+      console.log("DB user obtained:", dbUser?.id);
+    } catch (dbError: any) {
       console.error("Failed to get/create user:", dbError);
-      return NextResponse.json({ error: "Database error: user" }, { status: 500 });
+      console.error("Error details:", JSON.stringify(dbError, null, 2));
+      return NextResponse.json({ 
+        error: "Database error: " + (dbError?.message || "user creation failed") 
+      }, { status: 500 });
+    }
+    
+    if (!dbUser) {
+      console.error("dbUser is null/undefined after getOrCreateUser");
+      return NextResponse.json({ error: "User record not found" }, { status: 500 });
     }
 
     // Get session cookie for authenticated scraping (optional)

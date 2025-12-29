@@ -81,18 +81,39 @@ export interface DmLog {
 
 // Database helper functions
 export async function getOrCreateUser(authUserId: string, email: string, name?: string): Promise<User> {
-  const supabase = await createClient();
+  // Use service role client for user creation to bypass RLS
+  const { createClient: createAdminClient } = await import("@supabase/supabase-js");
+  
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error("Missing Supabase config:", { 
+      hasUrl: !!supabaseUrl, 
+      hasServiceKey: !!serviceRoleKey 
+    });
+    throw new Error("Supabase not configured");
+  }
+  
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey);
   
   // First, try to get existing user
-  const { data: existingUser } = await supabase
+  const { data: existingUser, error: selectError } = await supabase
     .from("users")
     .select("*")
     .eq("id", authUserId)
     .single();
   
+  if (selectError && selectError.code !== 'PGRST116') {
+    // PGRST116 = row not found, which is expected
+    console.error("Error fetching user:", selectError);
+  }
+  
   if (existingUser) {
     return existingUser as User;
   }
+  
+  console.log("Creating new user:", authUserId, email);
   
   // Create new user if doesn't exist
   const { data: newUser, error } = await supabase
@@ -106,9 +127,11 @@ export async function getOrCreateUser(authUserId: string, email: string, name?: 
     .single();
   
   if (error) {
+    console.error("Error creating user:", error);
     throw error;
   }
   
+  console.log("User created successfully:", newUser?.id);
   return newUser as User;
 }
 
