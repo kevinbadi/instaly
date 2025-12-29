@@ -137,10 +137,14 @@ export default function ConnectPage() {
 
       if (response.ok) {
         setSteelSessionId(data.sessionId);
-        setSteelSessionUrl(data.liveViewUrl);
+        // Prefer debugUrl for better control, fallback to liveViewUrl
+        const browserUrl = data.debugUrl || data.liveViewUrl;
+        setSteelSessionUrl(browserUrl);
+        
+        console.log("Opening Steel browser:", browserUrl);
         
         // Open in new window - bypasses iframe restrictions
-        const steelWindow = window.open(data.liveViewUrl, "_blank", "width=1200,height=800");
+        const steelWindow = window.open(browserUrl, "_blank", "width=1200,height=800");
         
         if (!steelWindow) {
           toast({
