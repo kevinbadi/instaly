@@ -23,15 +23,29 @@ export async function POST(request: NextRequest) {
   console.log("=== SCRAPE API CALLED ===");
   console.log("PHANTOMBUSTER_API_KEY:", PHANTOMBUSTER_API_KEY ? "SET" : "NOT SET");
   console.log("PHANTOMBUSTER_AGENT_ID:", PHANTOMBUSTER_AGENT_ID);
+  console.log("SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "SET" : "NOT SET");
+  console.log("SUPABASE_ANON_KEY:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "SET" : "NOT SET");
   
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    let supabase;
+    try {
+      supabase = await createClient();
+    } catch (clientError) {
+      console.error("Failed to create Supabase client:", clientError);
+      return NextResponse.json({ error: "Database connection failed" }, { status: 500 });
+    }
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error("Auth error:", authError);
+      return NextResponse.json({ error: "Auth failed: " + authError.message }, { status: 401 });
+    }
 
     console.log("User:", user?.id);
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized - no user found" }, { status: 401 });
     }
 
     if (!PHANTOMBUSTER_API_KEY || !PHANTOMBUSTER_AGENT_ID) {
@@ -42,7 +56,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      console.error("Failed to parse request body:", parseError);
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    
     const { postUrl, campaignId, maxLikers = 100 } = body;
 
     if (!postUrl) {
@@ -60,7 +81,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dbUser = await getOrCreateUser(user.id, user.email!, user.user_metadata?.full_name);
+    let dbUser;
+    try {
+      dbUser = await getOrCreateUser(user.id, user.email || "", user.user_metadata?.full_name);
+    } catch (dbError) {
+      console.error("Failed to get/create user:", dbError);
+      return NextResponse.json({ error: "Database error: user" }, { status: 500 });
+    }
 
     // Get session cookie for authenticated scraping (optional)
     let sessionCookie: string | undefined;
