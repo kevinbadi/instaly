@@ -1,0 +1,29 @@
+# Instaly Worker Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core automation
+playwright==1.41.0
+
+# Supabase Python client
+supabase==2.3.0
+
+# AI message generation
+anthropic==0.18.0
+
+# Lead scraping (PhantomBuster integration)
+requests==2.31.0
+
+# Scheduling and async
+asyncio-throttle==1.0.2
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Logging
+loguru==0.7.2
+
+# Date handling
+python-dateutil==2.8.2
+
+# Colored terminal output
+colorama==0.4.6
