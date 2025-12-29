@@ -137,13 +137,63 @@ export default function ConnectPage() {
 
       if (response.ok) {
         setSteelSessionId(data.sessionId);
-        // Prefer debugUrl for better control, fallback to liveViewUrl
-        const browserUrl = data.debugUrl || data.liveViewUrl;
+        const browserUrl = data.liveViewUrl;
         setSteelSessionUrl(browserUrl);
         
-        console.log("Opening Steel browser:", browserUrl);
+        // If session is queued for Mac Mini navigation, poll until ready
+        if (data.queued) {
+          toast({
+            title: "Preparing browser...",
+            description: "Please wait while we load Instagram for you.",
+          });
+          
+          // Poll for navigation status
+          let attempts = 0;
+          const maxAttempts = 30; // 30 attempts * 2 seconds = 60 seconds max
+          
+          const pollStatus = async (): Promise<boolean> => {
+            const statusRes = await fetch(`/api/steel/status?sessionId=${data.sessionId}`);
+            const statusData = await statusRes.json();
+            console.log("Session status:", statusData.status);
+            
+            if (statusData.status === "ready") {
+              return true;
+            } else if (statusData.status === "failed" || statusData.status === "manual") {
+              return false; // Will show manual instructions
+            }
+            return false; // Still pending/navigating
+          };
+          
+          // Poll until ready or timeout
+          while (attempts < maxAttempts) {
+            const ready = await pollStatus();
+            if (ready) {
+              // Navigation complete! Open the browser
+              const steelWindow = window.open(browserUrl, "_blank", "width=1200,height=800");
+              if (!steelWindow) {
+                toast({
+                  title: "Pop-up blocked",
+                  description: "Please allow pop-ups and try again.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              toast({
+                title: "Instagram loaded!",
+                description: "Log in to your account, then come back here.",
+              });
+              setConnecting(false);
+              return;
+            }
+            attempts++;
+            await new Promise(r => setTimeout(r, 2000)); // Wait 2 seconds
+          }
+          
+          // Timeout - show browser anyway with manual instructions
+          console.log("Navigation timeout, showing manual instructions");
+        }
         
-        // Open in new window - bypasses iframe restrictions
+        // Open browser (manual navigation needed)
         const steelWindow = window.open(browserUrl, "_blank", "width=1200,height=800");
         
         if (!steelWindow) {
@@ -156,8 +206,8 @@ export default function ConnectPage() {
         }
         
         toast({
-          title: "Browser opened!",
-          description: "Log in to Instagram in the new window, then come back here and click 'Capture Session'.",
+          title: "Browser opened",
+          description: "Navigate to Instagram and log in.",
         });
       } else {
         toast({

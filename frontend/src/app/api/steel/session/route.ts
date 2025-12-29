@@ -42,13 +42,26 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Return the player URL - user will navigate manually
+    // Queue session for Mac Mini worker to navigate
+    const { error: queueError } = await supabase.from("steel_session_queue").insert({
+      user_id: user.id,
+      session_id: session.id,
+      status: "pending",
+    });
+
+    if (queueError) {
+      console.error("Failed to queue session:", queueError);
+      // Continue anyway - we can still show the player
+    }
+
+    // Return the player URL and queue ID for polling
     const liveUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
     console.log("Live URL:", liveUrl);
 
     return NextResponse.json({
       sessionId: session.id,
       liveViewUrl: liveUrl,
+      queued: !queueError, // Let frontend know if it should poll
     });
   } catch (error) {
     console.error("Steel session error:", error);
