@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { spawn } from "child_process";
 import path from "path";
 
+export const dynamic = 'force-dynamic';
+
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
 
 function runNavigationScript(sessionId: string, apiKey: string): Promise<{ success: boolean; error?: string }> {

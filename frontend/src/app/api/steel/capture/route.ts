@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getOrCreateUser, createInstagramAccount, saveInstagramSession } from "@/lib/db";
 
+export const dynamic = 'force-dynamic';
+
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
 
 export async function POST(request: NextRequest) {
