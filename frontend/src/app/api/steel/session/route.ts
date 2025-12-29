@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = 'force-dynamic';
 
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
+const NAVIGATOR_URL = process.env.NAVIGATOR_URL; // Mac Mini endpoint
 
 export async function POST() {
   console.log("Steel session POST called");
@@ -20,8 +21,8 @@ export async function POST() {
       return NextResponse.json({ error: "Steel API key not configured" }, { status: 500 });
     }
 
-    // Create Steel session with startUrl
-    console.log("Creating Steel session with startUrl...");
+    // Create Steel session
+    console.log("Creating Steel session...");
     const sessionResponse = await fetch("https://api.steel.dev/v1/sessions", {
       method: "POST",
       headers: {
@@ -30,9 +31,6 @@ export async function POST() {
       },
       body: JSON.stringify({
         sessionTimeout: 600000, // 10 minutes
-        startUrl: "https://www.instagram.com/accounts/login/",
-        useProxy: true,
-        blockAds: true,
       }),
     });
 
@@ -43,27 +41,39 @@ export async function POST() {
     }
 
     const session = await sessionResponse.json();
-    console.log("Steel session created:", JSON.stringify(session));
+    console.log("Steel session created:", session.id);
 
-    // Log full session response for debugging
-    console.log("Full session response:", JSON.stringify(session, null, 2));
+    // Call Mac Mini to navigate the browser to Instagram
+    if (NAVIGATOR_URL) {
+      console.log("Calling Mac Mini navigator at:", NAVIGATOR_URL);
+      try {
+        const navResponse = await fetch(`${NAVIGATOR_URL}/navigate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: session.id }),
+        });
+        
+        const navResult = await navResponse.json();
+        console.log("Navigator result:", navResult);
+        
+        if (!navResult.success) {
+          console.warn("Navigation failed but continuing:", navResult.error);
+        }
+      } catch (navErr) {
+        console.warn("Could not reach Mac Mini navigator:", navErr);
+        // Continue anyway - user can navigate manually
+      }
+    } else {
+      console.warn("NAVIGATOR_URL not set - user will need to navigate manually");
+    }
 
-    // Get the session viewer URL from the response
-    // Steel might return different URL fields
-    const sessionViewerUrl = session.sessionViewerUrl || session.liveUrl || session.viewerUrl ||
-                             `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
-    
-    // Also construct a URL with the target page encoded
-    const playerWithUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true&url=${encodeURIComponent("https://www.instagram.com/accounts/login/")}`;
-    
-    console.log("Session viewer URL:", sessionViewerUrl);
-    console.log("Player with URL:", playerWithUrl);
+    // Return the player URL
+    const liveUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
+    console.log("Live URL:", liveUrl);
 
     return NextResponse.json({
       sessionId: session.id,
-      liveViewUrl: playerWithUrl, // Try with URL parameter
-      debugUrl: session.debugUrl,
-      wsEndpoint: session.websocketUrl || `wss://connect.steel.dev?sessionId=${session.id}&apiKey=${STEEL_API_KEY}`,
+      liveViewUrl: liveUrl,
     });
   } catch (error) {
     console.error("Steel session error:", error);

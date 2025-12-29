@@ -1,0 +1,14 @@
+{
+  "name": "instaly-worker",
+  "version": "1.0.0",
+  "description": "Worker scripts for Instaly",
+  "main": "index.js",
+  "scripts": {
+    "navigator": "python3 steel_navigator.py",
+    "tunnel": "npx localtunnel --port 5001 --subdomain instaly-navigator"
+  },
+  "dependencies": {
+    "puppeteer-core": "^21.6.1"
+  }
+}
+

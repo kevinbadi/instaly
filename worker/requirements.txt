@@ -27,3 +27,7 @@ python-dateutil==2.8.2
 
 # Colored terminal output
 colorama==0.4.6
+
+# Steel Navigator API
+flask==3.0.0
+flask-cors==4.0.0
