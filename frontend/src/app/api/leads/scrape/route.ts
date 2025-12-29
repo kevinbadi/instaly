@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOrCreateUser } from "@/lib/db";
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // 5 minutes max (requires Vercel Pro)
 
 const PHANTOMBUSTER_API_KEY = process.env.PHANTOMBUSTER_API_KEY;
 const PHANTOMBUSTER_AGENT_ID = process.env.PHANTOMBUSTER_AGENT_ID;

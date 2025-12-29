@@ -170,6 +170,10 @@ export default function LeadsPage() {
 
     setScraping(true);
     try {
+      // Use AbortController for timeout (5 min)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
+
       const response = await fetch("/api/leads/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,7 +181,10 @@ export default function LeadsPage() {
           postUrl: scrapeUrl,
           maxLikers: 100,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -195,13 +202,25 @@ export default function LeadsPage() {
           description: data.error || "Failed to scrape leads",
           variant: "destructive",
         });
+        // Still refresh in case some leads were added
+        fetchData();
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to scrape leads. Please try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        toast({
+          title: "Scraping timed out",
+          description: "The scrape took too long. Refreshing to check for leads...",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Connection error. Refreshing to check for leads...",
+          variant: "destructive",
+        });
+      }
+      // Refresh anyway - leads may have been added before timeout
+      fetchData();
     } finally {
       setScraping(false);
     }
