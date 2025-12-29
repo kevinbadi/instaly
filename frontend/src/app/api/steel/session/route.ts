@@ -1,43 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { spawn } from "child_process";
-import path from "path";
 
 export const dynamic = 'force-dynamic';
 
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
-
-function runNavigationScript(sessionId: string, apiKey: string): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    const scriptPath = path.join(process.cwd(), "scripts", "navigate-steel.js");
-    const child = spawn("node", [scriptPath, sessionId, apiKey], {
-      timeout: 45000,
-    });
-
-    let output = "";
-
-    child.stdout.on("data", (data) => {
-      output += data.toString();
-    });
-
-    child.stderr.on("data", (data) => {
-      console.log("Script:", data.toString().trim());
-    });
-
-    child.on("close", (code) => {
-      try {
-        const result = JSON.parse(output.trim());
-        resolve(result);
-      } catch {
-        resolve({ success: code === 0, error: output || "Script failed" });
-      }
-    });
-
-    child.on("error", (err) => {
-      resolve({ success: false, error: err.message });
-    });
-  });
-}
 
 export async function POST() {
   console.log("Steel session POST called");
@@ -54,8 +20,8 @@ export async function POST() {
       return NextResponse.json({ error: "Steel API key not configured" }, { status: 500 });
     }
 
-    // Create Steel session
-    console.log("Creating Steel session...");
+    // Create Steel session with Instagram as the start URL
+    console.log("Creating Steel session with Instagram start URL...");
     const sessionResponse = await fetch("https://api.steel.dev/v1/sessions", {
       method: "POST",
       headers: {
@@ -64,6 +30,7 @@ export async function POST() {
       },
       body: JSON.stringify({
         sessionTimeout: 600000, // 10 minutes
+        startUrl: "https://www.instagram.com/accounts/login/",
       }),
     });
 
@@ -76,15 +43,10 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Wait for browser to initialize
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Give the browser a moment to load the page
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // Run navigation script as subprocess (bypasses webpack)
-    console.log("Running navigation script...");
-    const navResult = await runNavigationScript(session.id, STEEL_API_KEY);
-    console.log("Navigation result:", navResult);
-
-    // Return the player URL regardless of navigation result
+    // Return the player URL
     const liveUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
     console.log("Live URL:", liveUrl);
 
