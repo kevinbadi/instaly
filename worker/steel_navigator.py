@@ -116,22 +116,22 @@ class SteelNavigator:
                     context = await browser.new_context()
                     page = await context.new_page()
 
-                # Navigate to target URL
+                # Try to navigate - but don't fail if Instagram blocks
                 print(f"   Navigating to {target_url}...")
-                await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
-                
-                # Wait a moment for page to fully load
-                await asyncio.sleep(2)
-                
-                print(f"   ✅ Page loaded: {page.url}")
+                try:
+                    await page.goto(target_url, wait_until="commit", timeout=15000)
+                    await asyncio.sleep(2)
+                    print(f"   ✅ Page loaded: {page.url}")
+                except Exception as nav_error:
+                    print(f"   ⚠️ Navigation blocked (Instagram may be blocking cloud IPs): {nav_error}")
+                    print(f"   ℹ️ Browser is still usable - user can manually navigate")
+                    # Still return True - browser is ready, just not on Instagram
                 
                 # Don't close the browser - user needs it!
-                # Just disconnect our control
-                
                 return True
 
         except Exception as e:
-            print(f"   ❌ Navigation error: {e}")
+            print(f"   ❌ Connection error: {e}")
             return False
 
 
