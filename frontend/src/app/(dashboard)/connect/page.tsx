@@ -142,7 +142,7 @@ export default function ConnectPage() {
         
         toast({
           title: "Browser ready!",
-          description: "Navigate to instagram.com/accounts/login in the browser below.",
+          description: "Log in to Instagram in the browser below.",
         });
       } else {
         toast({
@@ -334,8 +334,8 @@ export default function ConnectPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-sm">
-                  <strong>Instructions:</strong> Navigate to <code className="bg-muted px-1 rounded">instagram.com/accounts/login</code> in the browser below, then log in.
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-sm">
+                  <strong>Log in to Instagram</strong> in the browser below, then click &quot;Capture Session&quot; when done.
                 </div>
                 <div className="bg-black rounded-lg overflow-hidden border" style={{ height: "550px" }}>
                   <iframe

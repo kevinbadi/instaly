@@ -20,8 +20,8 @@ export async function POST() {
       return NextResponse.json({ error: "Steel API key not configured" }, { status: 500 });
     }
 
-    // Create Steel session with Instagram as the start URL
-    console.log("Creating Steel session with Instagram start URL...");
+    // Create Steel session
+    console.log("Creating Steel session...");
     const sessionResponse = await fetch("https://api.steel.dev/v1/sessions", {
       method: "POST",
       headers: {
@@ -30,7 +30,6 @@ export async function POST() {
       },
       body: JSON.stringify({
         sessionTimeout: 600000, // 10 minutes
-        startUrl: "https://www.instagram.com/accounts/login/",
       }),
     });
 
@@ -43,8 +42,37 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Give the browser a moment to load the page
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    // Wait for browser to initialize
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Navigate to Instagram using Steel's scrape endpoint (which navigates to the URL)
+    console.log("Navigating to Instagram...");
+    try {
+      const navResponse = await fetch(`https://api.steel.dev/v1/sessions/${session.id}/scrape`, {
+        method: "POST",
+        headers: {
+          "Steel-Api-Key": STEEL_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: "https://www.instagram.com/accounts/login/",
+          waitFor: 3000,
+        }),
+      });
+
+      if (navResponse.ok) {
+        console.log("Navigation to Instagram successful");
+      } else {
+        const navError = await navResponse.text();
+        console.log("Navigation response:", navResponse.status, navError);
+        // Continue anyway - user can manually navigate if needed
+      }
+    } catch (navErr) {
+      console.log("Navigation error (continuing anyway):", navErr);
+    }
+
+    // Give page time to load
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Return the player URL
     const liveUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
