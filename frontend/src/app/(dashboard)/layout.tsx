@@ -16,6 +16,7 @@ import {
   LogOut,
   User,
   CreditCard,
+  DollarSign,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -43,6 +44,7 @@ const sidebarLinks = [
   { href: "/connect", icon: Link2, label: "Connect Instagram" },
   { href: "/pricing", icon: CreditCard, label: "Pricing" },
   { href: "/settings", icon: Settings, label: "Settings" },
+  { href: "/affiliate", icon: DollarSign, label: "Affiliate" },
 ];
 
 export default function DashboardLayout({
