@@ -51,6 +51,28 @@ export async function POST(request: NextRequest) {
     const context = await contextResponse.json();
     const { cookies, localStorage } = context;
 
+    // DEBUG: Log full context
+    console.log("=== STEEL CONTEXT DEBUG ===");
+    console.log("Full context keys:", Object.keys(context));
+    console.log("Cookies count:", cookies?.length || 0);
+    console.log("localStorage keys:", localStorage ? Object.keys(localStorage) : "none");
+    
+    // Log all cookies
+    console.log("\n=== ALL COOKIES ===");
+    cookies?.forEach((c: any) => {
+      console.log(`  ${c.name}: ${c.value?.substring(0, 50)}...`);
+    });
+    
+    // Log all localStorage
+    console.log("\n=== ALL LOCALSTORAGE ===");
+    if (localStorage) {
+      Object.entries(localStorage).forEach(([key, value]) => {
+        const valStr = typeof value === 'string' ? value : JSON.stringify(value);
+        console.log(`  ${key}: ${valStr?.substring(0, 100)}...`);
+      });
+    }
+    console.log("=== END DEBUG ===\n");
+
     // Find session cookie and csrf token
     const sessionCookie = cookies?.find(
       (c: any) => c.name === "sessionid"
@@ -66,41 +88,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try to extract username from localStorage
+    // Try to extract username from various sources
     let username = "instagram_user";
     
-    console.log("Extracting username from localStorage...");
-    console.log("localStorage keys:", localStorage ? Object.keys(localStorage) : "none");
+    // Method 1: ds_user_id cookie + API call to get username
+    const dsUserIdCookie = cookies?.find((c: any) => c.name === "ds_user_id")?.value;
+    console.log("ds_user_id cookie:", dsUserIdCookie);
     
+    // Method 2: Check localStorage for username
     if (localStorage) {
-      try {
-        // Username is in one_tap_storage_version field
-        const oneTapStorage = localStorage["one_tap_storage_version"];
-        if (oneTapStorage) {
-          console.log("Found one_tap_storage_version:", oneTapStorage);
-          const parsed = typeof oneTapStorage === "string" ? JSON.parse(oneTapStorage) : oneTapStorage;
-          // The structure is { "userId": { "username": "actual_username", ... } }
-          const userIds = Object.keys(parsed);
-          if (userIds.length > 0) {
-            const userData = parsed[userIds[0]];
-            if (userData?.username) {
-              username = userData.username;
-              console.log("Extracted username:", username);
+      // Try various localStorage keys where Instagram might store username
+      const keysToTry = [
+        "one_tap_storage_version",
+        "wwwData",
+        "fb_local_storage",
+        "webPushData",
+        "idb-heartbeat-timestamp"
+      ];
+      
+      for (const key of keysToTry) {
+        const val = localStorage[key];
+        if (val) {
+          console.log(`Checking ${key}:`, typeof val === 'string' ? val.substring(0, 200) : JSON.stringify(val).substring(0, 200));
+          
+          try {
+            const parsed = typeof val === "string" ? JSON.parse(val) : val;
+            
+            // Look for username in various structures
+            if (parsed?.username) {
+              username = parsed.username;
+              console.log(`Found username in ${key}:`, username);
+              break;
             }
+            
+            // Check nested objects
+            if (typeof parsed === 'object') {
+              const jsonStr = JSON.stringify(parsed);
+              // Look for username pattern in the JSON
+              const usernameMatch = jsonStr.match(/"username"\s*:\s*"([^"]+)"/);
+              if (usernameMatch && usernameMatch[1]) {
+                username = usernameMatch[1];
+                console.log(`Found username via regex in ${key}:`, username);
+                break;
+              }
+            }
+          } catch (e) {
+            // Not JSON, skip
           }
         }
-      } catch (e) {
-        console.error("Error parsing one_tap_storage_version:", e);
       }
-      
-      // Fallback: try ds_user_id cookie to get user ID, then look it up
-      if (username === "instagram_user") {
-        const dsUserIdCookie = cookies?.find((c: any) => c.name === "ds_user_id")?.value;
-        if (dsUserIdCookie) {
-          console.log("Found ds_user_id:", dsUserIdCookie);
-          // We have the user ID but not username - could make an API call here
-          // For now, use ds_user_id as a fallback identifier
+    }
+    
+    // Method 3: If still no username, try to fetch from Instagram API using session
+    if (username === "instagram_user" && dsUserIdCookie) {
+      console.log("Attempting to fetch username from Instagram API...");
+      try {
+        const igResponse = await fetch(`https://i.instagram.com/api/v1/users/${dsUserIdCookie}/info/`, {
+          headers: {
+            "Cookie": `sessionid=${sessionCookie}; ds_user_id=${dsUserIdCookie}`,
+            "User-Agent": "Instagram 76.0.0.15.395 Android (24/7.0; 640dpi; 1440x2560; samsung; SM-G930F; herolte; samsungexynos8890; en_US; 138226743)",
+          },
+        });
+        
+        if (igResponse.ok) {
+          const igData = await igResponse.json();
+          console.log("Instagram API response:", JSON.stringify(igData).substring(0, 500));
+          if (igData?.user?.username) {
+            username = igData.user.username;
+            console.log("Got username from Instagram API:", username);
+          }
+        } else {
+          console.log("Instagram API failed:", igResponse.status);
         }
+      } catch (e) {
+        console.error("Error fetching from Instagram API:", e);
       }
     }
     
