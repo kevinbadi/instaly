@@ -1,8 +1,4 @@
 {
-  "framework": "nextjs",
-  "functions": {
-    "src/app/api/leads/scrape/route.ts": {
-      "maxDuration": 300
-    }
-  }
+  "trailingSlash": false,
+  "cleanUrls": false
 }
