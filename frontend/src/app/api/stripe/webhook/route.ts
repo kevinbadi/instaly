@@ -5,67 +5,86 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = 'force-dynamic';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+// Helper to get plan details from price ID
+function getPlanDetails(priceId: string): { name: string; maxAccounts: number; maxDmsPerDay: number } {
+  const starterPriceId = process.env.STRIPE_STARTER_PRICE_ID;
+  const growthPriceId = process.env.STRIPE_GROWTH_PRICE_ID;
+  
+  console.log("Looking up price:", priceId);
+  console.log("Starter price ID:", starterPriceId);
+  console.log("Growth price ID:", growthPriceId);
+  
+  if (priceId === starterPriceId) {
+    return { name: "starter", maxAccounts: 1, maxDmsPerDay: 200 };
+  }
+  if (priceId === growthPriceId) {
+    return { name: "growth", maxAccounts: 3, maxDmsPerDay: 600 };
+  }
+  
+  console.warn("Unknown price ID:", priceId);
+  return { name: "unknown", maxAccounts: 0, maxDmsPerDay: 0 };
+}
 
-const PRICE_TO_PLAN: Record<string, { name: string; maxAccounts: number; maxDmsPerDay: number }> = {
-  [process.env.STRIPE_STARTER_PRICE_ID!]: {
-    name: "starter",
-    maxAccounts: 1,
-    maxDmsPerDay: 200,
-  },
-  [process.env.STRIPE_GROWTH_PRICE_ID!]: {
-    name: "growth",
-    maxAccounts: 3,
-    maxDmsPerDay: 600,
-  },
-};
-
-async function getSupabaseAdmin() {
+function getSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
 
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!);
+}
+
 export async function POST(request: NextRequest) {
+  console.log("=== STRIPE WEBHOOK RECEIVED ===");
+  
   const body = await request.text();
   const headersList = await headers();
   const signature = headersList.get("stripe-signature");
+
+  console.log("Signature present:", !!signature);
+  console.log("Webhook secret configured:", !!process.env.STRIPE_WEBHOOK_SECRET);
 
   if (!signature) {
     console.error("No Stripe signature found");
     return NextResponse.json({ error: "No signature" }, { status: 400 });
   }
 
+  const stripe = getStripe();
   let event: Stripe.Event;
 
   try {
-    // For testing without webhook secret, skip verification
+    // Verify webhook signature
     if (process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_WEBHOOK_SECRET !== "whsec_xxxxx") {
       event = stripe.webhooks.constructEvent(
         body,
         signature,
         process.env.STRIPE_WEBHOOK_SECRET
       );
+      console.log("✅ Webhook signature verified");
     } else {
       // Parse event directly for testing
       event = JSON.parse(body) as Stripe.Event;
       console.log("⚠️ Webhook signature verification skipped (no webhook secret configured)");
     }
-  } catch (err) {
-    console.error("Webhook signature verification failed:", err);
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  } catch (err: any) {
+    console.error("Webhook signature verification failed:", err.message);
+    return NextResponse.json({ error: "Invalid signature: " + err.message }, { status: 400 });
   }
 
-  console.log(`Stripe webhook received: ${event.type}`);
+  console.log(`Stripe webhook event type: ${event.type}`);
 
-  const supabase = await getSupabaseAdmin();
+  const supabase = getSupabaseAdmin();
 
   try {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         console.log("Checkout completed:", session.id);
+        console.log("Subscription ID:", session.subscription);
+        console.log("Customer ID:", session.customer);
+        console.log("Metadata:", session.metadata);
         
         if (session.mode === "subscription" && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
@@ -123,11 +142,7 @@ async function handleSubscriptionChange(
   });
 
   // Get plan details
-  const planDetails = PRICE_TO_PLAN[priceId] || {
-    name: "unknown",
-    maxAccounts: 0,
-    maxDmsPerDay: 0,
-  };
+  const planDetails = getPlanDetails(priceId);
 
   // Find user by stripe_customer_id or metadata
   let userIdToUse = userId;
