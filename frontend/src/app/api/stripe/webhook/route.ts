@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic';
 
 // Helper to get plan details from price ID
 function getPlanDetails(priceId: string): { name: string; maxAccounts: number; maxDmsPerDay: number } {
-  const starterPriceId = process.env.STRIPE_STARTER_PRICE_ID;
-  const growthPriceId = process.env.STRIPE_GROWTH_PRICE_ID;
+  const starterPriceId = process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID;
+  const growthPriceId = process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID;
   
   console.log("Looking up price:", priceId);
   console.log("Starter price ID:", starterPriceId);
