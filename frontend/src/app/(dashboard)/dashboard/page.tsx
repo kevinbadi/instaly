@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { useSearchParams, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
 import {
   MessageCircle,
   Users,
@@ -12,6 +14,9 @@ import {
   Clock,
   Play,
   Pause,
+  PartyPopper,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +51,8 @@ interface RecentDm {
 }
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [stats, setStats] = useState<Stats>({
     dmsSentToday: 0,
     dailyLimit: 200,
@@ -58,6 +65,46 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [recentDms, setRecentDms] = useState<RecentDm[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCelebration, setShowCelebration] = useState(false);
+
+  // Check for successful checkout and trigger celebration
+  useEffect(() => {
+    if (searchParams.get("checkout") === "success") {
+      setShowCelebration(true);
+      
+      // Fire confetti
+      const duration = 3000;
+      const end = Date.now() + duration;
+
+      const colors = ["#39FF14", "#00ff88", "#ffffff", "#c0c0c0"];
+
+      (function frame() {
+        confetti({
+          particleCount: 4,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+          colors: colors,
+        });
+        confetti({
+          particleCount: 4,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+          colors: colors,
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      })();
+
+      // Clear the URL parameter after showing celebration
+      setTimeout(() => {
+        router.replace("/dashboard", { scroll: false });
+      }, 500);
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -130,6 +177,51 @@ export default function DashboardPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
+      {/* Celebration Banner */}
+      <AnimatePresence>
+        {showCelebration && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{ type: "spring", damping: 15, stiffness: 300 }}
+            className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/20 via-emerald-400/10 to-emerald-500/20 p-6 shadow-2xl shadow-emerald-500/20"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(57,255,20,0.1),transparent_70%)]" />
+            <button
+              onClick={() => setShowCelebration(false)}
+              className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="relative flex items-center gap-6">
+              <div className="flex-shrink-0">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                  <PartyPopper className="h-8 w-8 text-black" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-2xl font-bold text-white">Welcome to the family!</h2>
+                  <Sparkles className="h-6 w-6 text-yellow-400 animate-pulse" />
+                </div>
+                <p className="text-emerald-100/80">
+                  Your subscription is now active. You're all set to start automating your Instagram outreach and growing your business!
+                </p>
+              </div>
+              <div className="hidden md:block">
+                <Link href="/connect">
+                  <Button variant="gradient" className="shadow-lg shadow-emerald-500/30">
+                    Connect Instagram
+                    <ArrowUpRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
