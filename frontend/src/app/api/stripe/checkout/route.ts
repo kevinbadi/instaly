@@ -8,15 +8,31 @@ export const dynamic = 'force-dynamic';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(request: NextRequest) {
+  console.log("=== CHECKOUT API CALLED ===");
+  
   try {
+    // Check env vars
+    console.log("SUPABASE_URL:", process.env.NEXT_PUBLIC_SUPABASE_URL ? "SET" : "NOT SET");
+    console.log("SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? "SET" : "NOT SET");
+    console.log("STRIPE_SECRET_KEY:", process.env.STRIPE_SECRET_KEY ? "SET" : "NOT SET");
+    
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error("Auth error:", authError);
+      return NextResponse.json({ error: "Auth error: " + authError.message }, { status: 401 });
+    }
 
     if (!user) {
+      console.error("No user found");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    console.log("User authenticated:", user.id, user.email);
+
     const { priceId } = await request.json();
+    console.log("Price ID:", priceId);
 
     if (!priceId) {
       return NextResponse.json({ error: "Price ID required" }, { status: 400 });
@@ -29,15 +45,22 @@ export async function POST(request: NextRequest) {
     );
 
     // First, ensure user exists in users table
-    let { data: dbUser } = await adminClient
+    console.log("Checking if user exists in DB...");
+    let { data: dbUser, error: fetchError } = await adminClient
       .from("users")
       .select("id, email, stripe_customer_id")
       .eq("id", user.id)
       .single();
 
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error("Error fetching user:", fetchError);
+    }
+
+    console.log("DB user found:", dbUser ? "YES" : "NO");
+
     // If user doesn't exist, create them
     if (!dbUser) {
-      console.log("Creating user in database:", user.id);
+      console.log("Creating user in database:", user.id, user.email);
       const { data: newUser, error: createError } = await adminClient
         .from("users")
         .insert({
@@ -50,8 +73,9 @@ export async function POST(request: NextRequest) {
 
       if (createError) {
         console.error("Failed to create user:", createError);
-        return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+        return NextResponse.json({ error: "Failed to create user: " + createError.message }, { status: 500 });
       }
+      console.log("User created:", newUser);
       dbUser = newUser;
     }
 
