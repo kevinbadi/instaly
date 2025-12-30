@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     const { data: session } = await adminClient
       .from("instagram_sessions")
-      .select("session_id")
+      .select("session_id, session_data")
       .eq("instagram_account_id", accounts[0].id)
       .eq("status", "active")
       .single();
@@ -94,7 +94,32 @@ export async function POST(request: NextRequest) {
 
     console.log(`Scraping ${postUrl} with Apify (max ${Math.min(maxLikers, 100)} likers)...`);
 
-    // Launch Apify actor with user's Instagram cookie
+    // Extract Instagram cookies from stored session_data
+    let cookiesForApify: Array<{name: string; value: string; domain: string}> = [];
+    
+    if (session.session_data?.cookies) {
+      // Filter only Instagram cookies and format for Apify
+      cookiesForApify = session.session_data.cookies
+        .filter((c: any) => c.domain?.includes('instagram.com'))
+        .map((c: any) => ({
+          name: c.name,
+          value: c.value,
+          domain: c.domain,
+        }));
+      console.log(`Using ${cookiesForApify.length} Instagram cookies from stored session`);
+    } else {
+      // Fallback to just sessionid if full cookies not available
+      cookiesForApify = [
+        {
+          name: "sessionid",
+          value: session.session_id,
+          domain: ".instagram.com",
+        },
+      ];
+      console.log("Using sessionid only (no full session_data available)");
+    }
+
+    // Launch Apify actor with user's Instagram cookies
     const apifyResponse = await fetch(
       `https://api.apify.com/v2/acts/clothefobia~instagram-post-like-user-extractor/runs?token=${APIFY_API_TOKEN}`,
       {
@@ -103,13 +128,7 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          cookies: [
-            {
-              name: "sessionid",
-              value: session.session_id,
-              domain: ".instagram.com",
-            },
-          ],
+          cookies: cookiesForApify,
           proxy: {
             useApifyProxy: true,
           },
