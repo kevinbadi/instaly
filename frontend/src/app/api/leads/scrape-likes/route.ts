@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     console.log(`Scraping ${postUrls.length} post(s)...`);
 
     // Call Apify API with the Instagram session cookie
+    // The API expects cookies as an array of cookie objects
     const apifyResponse = await fetch(
       `https://api.apify.com/v2/acts/clothefobia~instagram-post-like-user-extractor/runs?token=${APIFY_TOKEN}`,
       {
@@ -72,7 +73,13 @@ export async function POST(request: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          cookies: `[${session.session_id}]`,
+          cookies: [
+            {
+              name: "sessionid",
+              value: session.session_id,
+              domain: ".instagram.com",
+            },
+          ],
           proxy: {
             useApifyProxy: true,
           },
