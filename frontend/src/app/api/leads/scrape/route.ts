@@ -135,9 +135,17 @@ export async function POST(request: NextRequest) {
     console.log(`Apify run started: ${runId}`);
 
     // Wait for completion and get results
-    const result = await waitForApifyCompletion(runId, datasetId, dbUser.id, campaignId, postUrl);
+    const result = await waitForApifyCompletion(runId, datasetId, dbUser.id, campaignId, postUrl, accounts[0].id, adminClient);
 
     if (result.error) {
+      // If session expired, return specific error
+      if (result.sessionExpired) {
+        return NextResponse.json({
+          success: false,
+          error: "Your Instagram session has expired. Please reconnect your Instagram account.",
+          sessionExpired: true,
+        }, { status: 401 });
+      }
       return NextResponse.json({
         success: false,
         error: result.error,
@@ -166,8 +174,10 @@ async function waitForApifyCompletion(
   datasetId: string,
   userId: string,
   campaignId: string | undefined,
-  postUrl: string
-): Promise<{ leadsScraped?: number; error?: string }> {
+  postUrl: string,
+  instagramAccountId: string,
+  adminClient: any
+): Promise<{ leadsScraped?: number; error?: string; sessionExpired?: boolean }> {
   const maxWaitTime = 180000; // 3 minutes
   const pollInterval = 3000; // 3 seconds
   const startTime = Date.now();
@@ -218,6 +228,20 @@ async function waitForApifyCompletion(
         return { leadsScraped: 0 };
 
       } else if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
+        // Check if it's a session/auth issue by looking at logs
+        console.log(`[Scrape] Run failed with status: ${status}`);
+        
+        // Mark session as expired since the scrape failed (likely auth issue)
+        if (status === "FAILED") {
+          console.log(`[Scrape] Marking session as expired for account ${instagramAccountId}`);
+          await adminClient
+            .from("instagram_sessions")
+            .update({ status: "expired" })
+            .eq("instagram_account_id", instagramAccountId);
+          
+          return { error: "Instagram session expired", sessionExpired: true };
+        }
+        
         return { error: `Scrape ${status.toLowerCase()}` };
       }
       // Still running, continue polling
