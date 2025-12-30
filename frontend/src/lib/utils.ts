@@ -52,6 +52,7 @@ export function truncate(str: string, length: number): string {
   return str.slice(0, length) + "...";
 }
 
+// Price IDs are loaded from environment variables (NEXT_PUBLIC_ for client-side access)
 export const PRICING_TIERS = {
   starter: {
     name: "Starter",
@@ -59,7 +60,7 @@ export const PRICING_TIERS = {
     dmsPerMonth: 6000,
     dmsPerDay: 200,
     accounts: 1,
-    priceId: "price_1SjqgbGs86NPbh7rx7vjacEQ",
+    priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || "",
     features: [
       "1 Instagram Account",
       "200 DMs/day",
@@ -75,7 +76,7 @@ export const PRICING_TIERS = {
     dmsPerMonth: 18000,
     dmsPerDay: 600,
     accounts: 3,
-    priceId: "price_1SjqhRGs86NPbh7r8D9A1e5u",
+    priceId: process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID || "",
     popular: true,
     features: [
       "3 Instagram Accounts",
@@ -104,7 +105,7 @@ export const PRICING_TIERS = {
       "Custom Integrations",
     ],
   },
-} as const;
+};
 
 
 
