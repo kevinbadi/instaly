@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
       ],
       success_url: `${appUrl}/dashboard?checkout=success`,
       cancel_url: `${appUrl}/pricing?checkout=canceled`,
+      allow_promotion_codes: true, // Enable discount/promo code field
       metadata: {
         supabase_user_id: user.id,
       },
