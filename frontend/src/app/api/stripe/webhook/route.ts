@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleSubscriptionChange(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   subscription: Stripe.Subscription
 ) {
   const customerId = subscription.customer as string;
@@ -172,7 +172,7 @@ async function handleSubscriptionChange(
 }
 
 async function handleSubscriptionCanceled(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   subscription: Stripe.Subscription
 ) {
   const customerId = subscription.customer as string;
