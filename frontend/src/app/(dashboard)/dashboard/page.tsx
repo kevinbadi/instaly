@@ -9,7 +9,6 @@ import {
   Users,
   Target,
   ArrowUpRight,
-  ArrowDownRight,
   Calendar,
   Clock,
   Play,
@@ -132,8 +131,6 @@ export default function DashboardPage() {
       value: stats.dmsSentToday,
       subtitle: `${stats.dailyLimit - stats.dmsSentToday} remaining`,
       icon: MessageCircle,
-      change: "+12%",
-      positive: true,
       progress: (stats.dmsSentToday / stats.dailyLimit) * 100,
     },
     {
@@ -141,16 +138,12 @@ export default function DashboardPage() {
       value: stats.totalLeads.toLocaleString(),
       subtitle: `${stats.messagedLeads} messaged`,
       icon: Users,
-      change: "+8%",
-      positive: true,
     },
     {
       title: "Active Campaigns",
       value: stats.activeCampaigns,
       subtitle: "Running now",
       icon: Target,
-      change: "0",
-      positive: true,
     },
   ];
 
@@ -270,33 +263,12 @@ export default function DashboardPage() {
                   {stat.subtitle}
                 </p>
                 
-                {/* Progress bar - only for first card, otherwise spacer */}
-                <div className="h-2 mb-3">
-                  {stat.progress !== undefined && (
+                {/* Progress bar - only for first card */}
+                {stat.progress !== undefined && (
+                  <div className="h-2 mt-auto">
                     <Progress value={stat.progress} className="h-2" />
-                  )}
-                </div>
-                
-                {/* Bottom section - change indicator (always show for consistency) */}
-                <div className="mt-auto flex items-center gap-1">
-                  {stat.change !== "0" ? (
-                    <>
-                      {stat.positive ? (
-                        <ArrowUpRight className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4 text-red-400" />
-                      )}
-                      <span className={stat.positive ? "text-emerald-400 text-sm font-medium" : "text-red-400 text-sm font-medium"}>
-                        {stat.change}
-                      </span>
-                      <span className="text-muted-foreground text-sm">
-                        vs last week
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">&nbsp;</span>
-                  )}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
