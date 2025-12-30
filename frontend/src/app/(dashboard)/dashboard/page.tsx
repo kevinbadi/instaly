@@ -206,7 +206,7 @@ export default function DashboardPage() {
                   <Sparkles className="h-6 w-6 text-yellow-400 animate-pulse" />
                 </div>
                 <p className="text-emerald-100/80">
-                  Your subscription is now active. You're all set to start automating your Instagram outreach and growing your business!
+                  Your subscription is now active. You&apos;re all set to start automating your Instagram outreach and growing your business!
                 </p>
               </div>
               <div className="hidden md:block">
