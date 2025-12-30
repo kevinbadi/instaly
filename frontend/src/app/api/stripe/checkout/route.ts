@@ -4,9 +4,7 @@ import Stripe from "stripe";
 
 export const dynamic = 'force-dynamic';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 const PRICE_TO_PLAN: Record<string, { name: string; maxAccounts: number; maxDmsPerDay: number }> = {
   [process.env.STRIPE_STARTER_PRICE_ID!]: {
