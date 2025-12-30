@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getOrCreateUser } from "@/lib/db";
+import Stripe from "stripe";
 
 export const dynamic = 'force-dynamic';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-12-18.acacia",
+});
+
+const PRICE_TO_PLAN: Record<string, { name: string; maxAccounts: number; maxDmsPerDay: number }> = {
+  [process.env.STRIPE_STARTER_PRICE_ID!]: {
+    name: "starter",
+    maxAccounts: 1,
+    maxDmsPerDay: 200,
+  },
+  [process.env.STRIPE_GROWTH_PRICE_ID!]: {
+    name: "growth",
+    maxAccounts: 3,
+    maxDmsPerDay: 600,
+  },
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,28 +30,74 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { tier } = await request.json();
+    const { priceId } = await request.json();
 
-    // For testing: Just update the user's subscription directly
-    const dbUser = await getOrCreateUser(user.id, user.email!, user.user_metadata?.full_name);
+    if (!priceId) {
+      return NextResponse.json({ error: "Price ID required" }, { status: 400 });
+    }
 
-    await supabase
+    // Get or create Stripe customer
+    const { createClient: createAdminClient } = await import("@supabase/supabase-js");
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: dbUser } = await adminClient
       .from("users")
-      .update({
-        subscription_status: "active",
-        subscription_tier: tier || "starter",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", dbUser.id);
+      .select("id, email, stripe_customer_id")
+      .eq("id", user.id)
+      .single();
 
-    // Redirect back to dashboard
-    return NextResponse.json({ 
-      url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard?success=true` 
+    let customerId = dbUser?.stripe_customer_id;
+
+    if (!customerId) {
+      // Create new Stripe customer
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          supabase_user_id: user.id,
+        },
+      });
+      customerId = customer.id;
+
+      // Save customer ID to database
+      await adminClient
+        .from("users")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", user.id);
+    }
+
+    // Create checkout session
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      mode: "subscription",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      success_url: `${appUrl}/dashboard?checkout=success`,
+      cancel_url: `${appUrl}/pricing?checkout=canceled`,
+      metadata: {
+        supabase_user_id: user.id,
+      },
+      subscription_data: {
+        metadata: {
+          supabase_user_id: user.id,
+        },
+      },
     });
+
+    return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("Checkout error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to create checkout session" },
       { status: 500 }
     );
   }

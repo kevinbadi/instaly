@@ -15,6 +15,7 @@ import {
   X,
   LogOut,
   User,
+  CreditCard,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ const sidebarLinks = [
   { href: "/campaigns", icon: Target, label: "Campaigns" },
   { href: "/leads", icon: Users, label: "Leads" },
   { href: "/connect", icon: Link2, label: "Connect Instagram" },
+  { href: "/pricing", icon: CreditCard, label: "Pricing" },
   { href: "/settings", icon: Settings, label: "Settings" },
 ];
 

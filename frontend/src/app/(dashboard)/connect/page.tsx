@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Instagram,
@@ -16,6 +17,7 @@ import {
   Pencil,
   Check,
   X,
+  Crown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,8 +43,17 @@ interface InstagramAccount {
   session_status?: "active" | "expired" | "flagged";
 }
 
+interface Subscription {
+  plan_name: string;
+  status: string;
+  max_accounts: number;
+  max_dms_per_day: number;
+}
+
 export default function ConnectPage() {
+  const router = useRouter();
   const [accounts, setAccounts] = useState<InstagramAccount[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [connectDialogOpen, setConnectDialogOpen] = useState(false);
@@ -53,7 +64,51 @@ export default function ConnectPage() {
 
   useEffect(() => {
     fetchAccounts();
+    fetchSubscription();
   }, []);
+
+  const fetchSubscription = async () => {
+    try {
+      const response = await fetch("/api/stripe/subscription");
+      if (response.ok) {
+        const data = await response.json();
+        setSubscription(data.subscription);
+      }
+    } catch (error) {
+      console.error("Failed to fetch subscription:", error);
+    }
+  };
+
+  const canAddAccount = () => {
+    if (!subscription || subscription.status !== "active") {
+      return false;
+    }
+    return accounts.length < subscription.max_accounts;
+  };
+
+  const handleConnectClick = () => {
+    if (!subscription || subscription.status !== "active") {
+      toast({
+        title: "Subscription Required",
+        description: "You need an active subscription to connect Instagram accounts.",
+        variant: "destructive",
+      });
+      router.push("/pricing");
+      return;
+    }
+
+    if (!canAddAccount()) {
+      toast({
+        title: "Account Limit Reached",
+        description: `Your ${subscription.plan_name} plan allows ${subscription.max_accounts} account(s). Upgrade to connect more.`,
+        variant: "destructive",
+      });
+      router.push("/pricing");
+      return;
+    }
+
+    setConnectDialogOpen(true);
+  };
 
   const handleStartEdit = (account: InstagramAccount) => {
     setEditingAccountId(account.id);
@@ -318,14 +373,33 @@ export default function ConnectPage() {
           <p className="text-muted-foreground">
             Link your Instagram accounts for DM automation
           </p>
+          {subscription && subscription.status === "active" && (
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="text-xs">
+                <Crown className="h-3 w-3 mr-1" />
+                {subscription.plan_name.charAt(0).toUpperCase() + subscription.plan_name.slice(1)} Plan
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                {accounts.length} / {subscription.max_accounts} account{subscription.max_accounts > 1 ? "s" : ""} used
+              </span>
+            </div>
+          )}
+          {(!subscription || subscription.status !== "active") && (
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="destructive" className="text-xs">
+                No Active Plan
+              </Badge>
+              <Button variant="link" className="text-xs p-0 h-auto" onClick={() => router.push("/pricing")}>
+                Subscribe to connect accounts →
+              </Button>
+            </div>
+          )}
         </div>
+        <Button variant="gradient" onClick={handleConnectClick} disabled={!canAddAccount()}>
+          <Plus className="h-4 w-4 mr-2" />
+          Connect Account
+        </Button>
         <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
-          <DialogTrigger asChild>
-            <Button variant="gradient" onClick={() => setConnectDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Connect Account
-            </Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-[800px] max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>Connect Instagram Account</DialogTitle>
@@ -471,7 +545,7 @@ export default function ConnectPage() {
             <p className="text-muted-foreground mb-6">
               Connect your first Instagram account to start automating DMs.
             </p>
-            <Button variant="gradient" onClick={() => setConnectDialogOpen(true)}>
+            <Button variant="gradient" onClick={handleConnectClick}>
               <Plus className="h-4 w-4 mr-2" />
               Connect Account
             </Button>
