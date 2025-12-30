@@ -79,7 +79,7 @@ export default function AffiliatePage() {
           <CardHeader className="text-center pb-2">
             <CardTitle className="text-xl">Apply to Join</CardTitle>
             <CardDescription>
-              Fill out the form below and we'll get back to you shortly.
+              Fill out the form below and we&apos;ll get back to you shortly.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -94,7 +94,7 @@ export default function AffiliatePage() {
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Application Received!</h3>
                 <p className="text-muted-foreground">
-                  We'll review your application and reach out to you within 24-48 hours via email or Instagram DM.
+                  We&apos;ll review your application and reach out to you within 24-48 hours via email or Instagram DM.
                 </p>
               </motion.div>
             ) : (
