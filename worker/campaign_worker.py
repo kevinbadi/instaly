@@ -172,10 +172,16 @@ class CampaignWorker:
             return True
         
         try:
-            # Update campaign to show it's running (use UTC)
+            # IMMEDIATELY set next_run_at to prevent duplicate runs
+            # This prevents race conditions where the same campaign gets picked up
+            # by another poll cycle before processing completes
+            next_run = datetime.now(timezone.utc) + timedelta(minutes=COOLDOWN_MINUTES)
             self.supabase.table("campaigns").update({
-                "last_run_at": datetime.now(timezone.utc).isoformat()
+                "last_run_at": datetime.now(timezone.utc).isoformat(),
+                "next_run_at": next_run.isoformat()  # Set cooldown NOW, not after
             }).eq("id", campaign_id).execute()
+            
+            self.log(f"🔒 Set cooldown until {next_run.strftime('%H:%M:%S')} UTC", "info", campaign_name)
             
             # Create and run DM agent for this campaign
             agent = InstagramDMAgent(
@@ -189,13 +195,8 @@ class CampaignWorker:
             # Run the agent
             agent.run()
             
-            # Set next run time (cooldown) - use UTC for consistency
-            next_run = datetime.now(timezone.utc) + timedelta(minutes=COOLDOWN_MINUTES)
-            self.supabase.table("campaigns").update({
-                "next_run_at": next_run.isoformat()
-            }).eq("id", campaign_id).execute()
-            
-            self.log(f"✅ Campaign completed. Next run at {next_run}", "success", campaign_name)
+            # Cooldown was already set at the start to prevent race conditions
+            self.log(f"✅ Campaign completed successfully", "success", campaign_name)
             
             # Record result
             with self.results_lock:

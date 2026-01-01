@@ -8,3 +8,4 @@ echo "⏹️  Stopping Instaly Campaign Worker..."
 launchctl unload "$PLIST_DEST" 2>/dev/null || echo "Service was not running"
 echo "✅ Service stopped"
 
+

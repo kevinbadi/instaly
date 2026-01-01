@@ -738,6 +738,14 @@ class InstagramDMAgent:
                     
                     username = lead["username"]
                     message = lead["message"]
+                    lead_id = lead["id"]
+                    
+                    # Double-check lead hasn't been messaged since we loaded it
+                    # This prevents race conditions with parallel runs
+                    check = self.supabase.table("leads").select("dm_sent").eq("id", lead_id).single().execute()
+                    if check.data and check.data.get("dm_sent"):
+                        self.log(f"⏭️ @{username} already messaged, skipping", "info")
+                        continue
                     
                     result = self.send_dm(username, message)
                     

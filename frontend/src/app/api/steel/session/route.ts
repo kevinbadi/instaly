@@ -1,10 +1,62 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { spawn } from "child_process";
+import path from "path";
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
+
+async function navigateWithScript(sessionId: string, apiKey: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      // Path to the navigation script (runs puppeteer outside of webpack)
+      const scriptPath = path.join(process.cwd(), "scripts", "navigate-steel.js");
+      
+      console.log("Running navigation script:", scriptPath);
+      
+      const child = spawn("node", [scriptPath, sessionId, apiKey], {
+        timeout: 45000,
+      });
+
+      let stdout = "";
+      let stderr = "";
+
+      child.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on("data", (data) => {
+        stderr += data.toString();
+        console.log("Navigation script:", data.toString().trim());
+      });
+
+      child.on("close", (code) => {
+        console.log("Navigation script exited with code:", code);
+        if (stderr) {
+          console.log("Navigation stderr:", stderr);
+        }
+        
+        try {
+          const result = JSON.parse(stdout.trim());
+          resolve(result.success === true);
+        } catch {
+          resolve(code === 0);
+        }
+      });
+
+      child.on("error", (err) => {
+        console.error("Navigation script error:", err);
+        resolve(false);
+      });
+
+    } catch (error) {
+      console.error("Failed to spawn navigation script:", error);
+      resolve(false);
+    }
+  });
+}
 
 export async function POST() {
   console.log("Steel session POST called");
@@ -43,36 +95,23 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Store in database for Mac Mini worker to pick up
-    const adminClient = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    const { error: dbError } = await adminClient
-      .from("steel_navigation_queue")
-      .insert({
-        user_id: user.id,
-        steel_session_id: session.id,
-        target_url: "https://www.instagram.com/",
-        status: "pending",
-        created_at: new Date().toISOString(),
-      });
-
-    if (dbError) {
-      console.error("Failed to queue navigation:", dbError);
-      // Continue anyway - return session for manual navigation fallback
+    // Navigate to Instagram using external script (avoids webpack/serverless issues)
+    console.log("Navigating to Instagram...");
+    const navSuccess = await navigateWithScript(session.id, STEEL_API_KEY);
+    
+    if (navSuccess) {
+      console.log("Instagram loaded successfully!");
     } else {
-      console.log("Navigation queued for Mac Mini worker");
+      console.log("Navigation failed, user can navigate manually");
     }
 
-    // Return session ID - frontend will poll for status
-    const liveUrl = `https://api.steel.dev/v1/sessions/${session.id}/player?interactive=true&showControls=true`;
+    // Return session ID with live view URL
+    const liveUrl = `${session.debugUrl}?interactive=true&showControls=true`;
 
     return NextResponse.json({
       sessionId: session.id,
       liveViewUrl: liveUrl,
-      queued: !dbError, // Tell frontend to poll if queued
+      navigated: navSuccess,
     });
   } catch (error) {
     console.error("Steel session error:", error);

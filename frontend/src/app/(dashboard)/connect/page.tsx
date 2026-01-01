@@ -131,7 +131,7 @@ export default function ConnectPage() {
     }
 
     try {
-      const response = await fetch(`/api/instagram/accounts/${accountId}`, {
+      const response = await fetch(`/api/instagram-accounts/${accountId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ instagram_username: editedUsername.trim() }),

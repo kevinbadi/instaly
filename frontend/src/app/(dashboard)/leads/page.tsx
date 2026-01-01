@@ -17,6 +17,7 @@ import {
   Loader2,
   Link,
   Sparkles,
+  Heart,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,8 +75,11 @@ export default function LeadsPage() {
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
+  const [likesDialogOpen, setLikesDialogOpen] = useState(false);
   const [scrapeUrl, setScrapeUrl] = useState("");
+  const [likesUrl, setLikesUrl] = useState("");
   const [scraping, setScraping] = useState(false);
+  const [scrapingLikes, setScrapingLikes] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -226,6 +230,64 @@ export default function LeadsPage() {
     }
   };
 
+  const handleScrapeLikes = async () => {
+    if (!likesUrl) return;
+
+    setScrapingLikes(true);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
+
+      const response = await fetch("/api/leads/scrape-likes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postUrl: likesUrl,
+          maxLikers: 100,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast({
+          title: "Instagram Likes Scrape complete!",
+          description: `Found ${data.leadsScraped || 0} new leads from post likes.`,
+        });
+        setLikesDialogOpen(false);
+        setLikesUrl("");
+        fetchData();
+      } else {
+        toast({
+          title: "Likes scrape failed",
+          description: data.error || "Failed to scrape likes",
+          variant: "destructive",
+        });
+        fetchData();
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        toast({
+          title: "Scraping timed out",
+          description: "The scrape took too long. Refreshing to check for leads...",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Connection error. Refreshing to check for leads...",
+          variant: "destructive",
+        });
+      }
+      fetchData();
+    } finally {
+      setScrapingLikes(false);
+    }
+  };
+
   const handleDeleteLead = async (leadId: string) => {
     try {
       const response = await fetch(`/api/leads/${leadId}`, {
@@ -312,12 +374,77 @@ export default function LeadsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* Scrape from Post Dialog */}
-          <Dialog open={scrapeDialogOpen} onOpenChange={setScrapeDialogOpen}>
+          {/* Instagram Likes Scrape Dialog (Apify) */}
+          <Dialog open={likesDialogOpen} onOpenChange={setLikesDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="gradient">
+                <Heart className="h-4 w-4 mr-2" />
+                Instagram Likes Scrape
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Instagram Likes Scrape</DialogTitle>
+                <DialogDescription>
+                  Extract users who liked any Instagram post. Works with public posts - no cookies required!
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Instagram Post URL</label>
+                  <div className="relative">
+                    <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="https://instagram.com/p/ABC123..."
+                      className="pl-10"
+                      value={likesUrl}
+                      onChange={(e) => setLikesUrl(e.target.value)}
+                      disabled={scrapingLikes}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Uses your connected Instagram account to scrape up to 100 users who liked this post.
+                  </p>
+                </div>
+                {scrapingLikes && (
+                  <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <div>
+                      <p className="font-medium">Scraping likes...</p>
+                      <p className="text-sm text-muted-foreground">
+                        This may take 2-4 minutes. Please wait...
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <Button
+                  variant="gradient"
+                  className="w-full"
+                  onClick={handleScrapeLikes}
+                  disabled={!likesUrl || scrapingLikes}
+                >
+                  {scrapingLikes ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Scraping Likes...
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="h-4 w-4 mr-2" />
+                      Start Likes Scrape
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Scrape from Post Dialog (PhantomBuster) */}
+          <Dialog open={scrapeDialogOpen} onOpenChange={setScrapeDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Scrape Leads
+                Legacy Scrape
               </Button>
             </DialogTrigger>
             <DialogContent>
