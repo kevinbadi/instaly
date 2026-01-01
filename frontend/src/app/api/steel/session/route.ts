@@ -1,62 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { spawn } from "child_process";
-import path from "path";
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
-
-async function navigateWithScript(sessionId: string, apiKey: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      // Path to the navigation script (runs puppeteer outside of webpack)
-      const scriptPath = path.join(process.cwd(), "scripts", "navigate-steel.js");
-      
-      console.log("Running navigation script:", scriptPath);
-      
-      const child = spawn("node", [scriptPath, sessionId, apiKey], {
-        timeout: 45000,
-      });
-
-      let stdout = "";
-      let stderr = "";
-
-      child.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr.on("data", (data) => {
-        stderr += data.toString();
-        console.log("Navigation script:", data.toString().trim());
-      });
-
-      child.on("close", (code) => {
-        console.log("Navigation script exited with code:", code);
-        if (stderr) {
-          console.log("Navigation stderr:", stderr);
-        }
-        
-        try {
-          const result = JSON.parse(stdout.trim());
-          resolve(result.success === true);
-        } catch {
-          resolve(code === 0);
-        }
-      });
-
-      child.on("error", (err) => {
-        console.error("Navigation script error:", err);
-        resolve(false);
-      });
-
-    } catch (error) {
-      console.error("Failed to spawn navigation script:", error);
-      resolve(false);
-    }
-  });
-}
 
 export async function POST() {
   console.log("Steel session POST called");
@@ -95,14 +43,12 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Navigate to Instagram using external script (avoids webpack/serverless issues)
-    console.log("Navigating to Instagram...");
-    const navSuccess = await navigateWithScript(session.id, STEEL_API_KEY);
-    
-    if (navSuccess) {
-      console.log("Instagram loaded successfully!");
-    } else {
-      console.log("Navigation failed, user can navigate manually");
+    // Try to navigate using WebSocket CDP
+    let navigated = false;
+    try {
+      navigated = await navigateWithCDP(session.websocketUrl, STEEL_API_KEY);
+    } catch (navError) {
+      console.log("Navigation error (non-fatal):", navError);
     }
 
     // Return session ID with live view URL
@@ -111,7 +57,9 @@ export async function POST() {
     return NextResponse.json({
       sessionId: session.id,
       liveViewUrl: liveUrl,
-      navigated: navSuccess,
+      navigated,
+      // Include target URL so frontend can navigate if needed
+      targetUrl: "https://www.instagram.com/",
     });
   } catch (error) {
     console.error("Steel session error:", error);
@@ -120,4 +68,94 @@ export async function POST() {
       { status: 500 }
     );
   }
+}
+
+async function navigateWithCDP(websocketUrl: string, apiKey: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      console.log("CDP navigation timeout");
+      resolve(false);
+    }, 20000);
+
+    try {
+      const wsUrl = `${websocketUrl}&apiKey=${apiKey}`;
+      console.log("Connecting to Steel CDP...");
+      
+      // Use global WebSocket (available in Node 18+)
+      const ws = new WebSocket(wsUrl);
+      
+      let messageId = 1;
+      let attached = false;
+
+      ws.onopen = () => {
+        console.log("WebSocket connected, getting targets...");
+        ws.send(JSON.stringify({
+          id: messageId++,
+          method: "Target.getTargets",
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data as string);
+          
+          // Handle getTargets response
+          if (msg.result?.targetInfos && !attached) {
+            const pageTarget = msg.result.targetInfos.find((t: any) => t.type === "page");
+            if (pageTarget) {
+              console.log("Found page target, attaching...");
+              attached = true;
+              ws.send(JSON.stringify({
+                id: messageId++,
+                method: "Target.attachToTarget",
+                params: { targetId: pageTarget.targetId, flatten: true }
+              }));
+            }
+          }
+          
+          // Handle attachToTarget response
+          if (msg.result?.sessionId) {
+            console.log("Attached, navigating to Instagram...");
+            ws.send(JSON.stringify({
+              id: messageId++,
+              method: "Page.navigate",
+              params: { url: "https://www.instagram.com/" },
+              sessionId: msg.result.sessionId
+            }));
+          }
+          
+          // Handle navigation response
+          if (msg.result?.frameId) {
+            console.log("Navigation started!");
+            clearTimeout(timeout);
+            setTimeout(() => {
+              ws.close();
+              resolve(true);
+            }, 2000);
+          }
+          
+          if (msg.error) {
+            console.log("CDP error:", msg.error);
+          }
+        } catch (parseErr) {
+          console.log("Parse error:", parseErr);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        clearTimeout(timeout);
+        resolve(false);
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket closed");
+      };
+
+    } catch (error) {
+      console.error("CDP connection error:", error);
+      clearTimeout(timeout);
+      resolve(false);
+    }
+  });
 }
