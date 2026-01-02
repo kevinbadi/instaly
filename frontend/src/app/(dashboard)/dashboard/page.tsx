@@ -6,7 +6,6 @@ import {
   Send,
   Users,
   Megaphone,
-  TrendingUp,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -137,8 +136,8 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                  <Users className="h-6 w-6 text-blue-500" />
+                <div className="h-12 w-12 rounded-xl bg-slate-400/10 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-slate-400" />
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">Total Leads</p>
@@ -171,24 +170,6 @@ export default function DashboardPage() {
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="h-12 w-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-purple-500" />
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">Response Rate</p>
-              <p className="text-3xl font-bold">{stats?.responseRate || 0}%</p>
-              <p className="text-sm text-green-500 mt-1">+2.5% from last week</p>
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
 
       {/* Campaigns and Recent DMs */}
