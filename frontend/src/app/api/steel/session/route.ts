@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -43,12 +44,30 @@ export async function POST() {
     const session = await sessionResponse.json();
     console.log("Steel session created:", session.id);
 
-    // Try to navigate using WebSocket CDP
-    let navigated = false;
-    try {
-      navigated = await navigateWithCDP(session.websocketUrl, STEEL_API_KEY);
-    } catch (navError) {
-      console.log("Navigation error (non-fatal):", navError);
+    // Use admin client to insert into navigation queue (bypasses RLS)
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Queue the navigation task for Mac Mini worker
+    const targetUrl = "https://www.instagram.com/";
+    console.log("Queueing navigation task for Mac Mini worker...");
+    
+    const { error: queueError } = await adminClient
+      .from("steel_navigation_queue")
+      .insert({
+        user_id: user.id,
+        steel_session_id: session.id,
+        target_url: targetUrl,
+        status: "pending",
+      });
+
+    if (queueError) {
+      console.error("Failed to queue navigation task:", queueError);
+      // Don't fail the request - the browser will still work, user just has to navigate manually
+    } else {
+      console.log("Navigation task queued successfully");
     }
 
     // Return session ID with live view URL
@@ -57,9 +76,10 @@ export async function POST() {
     return NextResponse.json({
       sessionId: session.id,
       liveViewUrl: liveUrl,
-      navigated,
-      // Include target URL so frontend can navigate if needed
-      targetUrl: "https://www.instagram.com/",
+      // Tell frontend navigation is queued for Mac Mini worker
+      queued: !queueError,
+      // Include target URL so frontend can show instructions if needed
+      targetUrl,
     });
   } catch (error) {
     console.error("Steel session error:", error);
@@ -68,94 +88,4 @@ export async function POST() {
       { status: 500 }
     );
   }
-}
-
-async function navigateWithCDP(websocketUrl: string, apiKey: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      console.log("CDP navigation timeout");
-      resolve(false);
-    }, 20000);
-
-    try {
-      const wsUrl = `${websocketUrl}&apiKey=${apiKey}`;
-      console.log("Connecting to Steel CDP...");
-      
-      // Use global WebSocket (available in Node 18+)
-      const ws = new WebSocket(wsUrl);
-      
-      let messageId = 1;
-      let attached = false;
-
-      ws.onopen = () => {
-        console.log("WebSocket connected, getting targets...");
-        ws.send(JSON.stringify({
-          id: messageId++,
-          method: "Target.getTargets",
-        }));
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data as string);
-          
-          // Handle getTargets response
-          if (msg.result?.targetInfos && !attached) {
-            const pageTarget = msg.result.targetInfos.find((t: any) => t.type === "page");
-            if (pageTarget) {
-              console.log("Found page target, attaching...");
-              attached = true;
-              ws.send(JSON.stringify({
-                id: messageId++,
-                method: "Target.attachToTarget",
-                params: { targetId: pageTarget.targetId, flatten: true }
-              }));
-            }
-          }
-          
-          // Handle attachToTarget response
-          if (msg.result?.sessionId) {
-            console.log("Attached, navigating to Instagram...");
-            ws.send(JSON.stringify({
-              id: messageId++,
-              method: "Page.navigate",
-              params: { url: "https://www.instagram.com/" },
-              sessionId: msg.result.sessionId
-            }));
-          }
-          
-          // Handle navigation response
-          if (msg.result?.frameId) {
-            console.log("Navigation started!");
-            clearTimeout(timeout);
-            setTimeout(() => {
-              ws.close();
-              resolve(true);
-            }, 2000);
-          }
-          
-          if (msg.error) {
-            console.log("CDP error:", msg.error);
-          }
-        } catch (parseErr) {
-          console.log("Parse error:", parseErr);
-        }
-      };
-
-      ws.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        clearTimeout(timeout);
-        resolve(false);
-      };
-
-      ws.onclose = () => {
-        console.log("WebSocket closed");
-      };
-
-    } catch (error) {
-      console.error("CDP connection error:", error);
-      clearTimeout(timeout);
-      resolve(false);
-    }
-  });
 }
