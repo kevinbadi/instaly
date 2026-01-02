@@ -16,7 +16,6 @@ import {
   Trash2,
   Loader2,
   Link,
-  Sparkles,
   Heart,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,11 +73,8 @@ export default function LeadsPage() {
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [scrapeDialogOpen, setScrapeDialogOpen] = useState(false);
   const [likesDialogOpen, setLikesDialogOpen] = useState(false);
-  const [scrapeUrl, setScrapeUrl] = useState("");
   const [likesUrl, setLikesUrl] = useState("");
-  const [scraping, setScraping] = useState(false);
   const [scrapingLikes, setScrapingLikes] = useState(false);
 
   useEffect(() => {
@@ -167,67 +163,6 @@ export default function LeadsPage() {
     }
 
     setImportDialogOpen(false);
-  };
-
-  const handleScrapeLeads = async () => {
-    if (!scrapeUrl) return;
-
-    setScraping(true);
-    try {
-      // Use AbortController for timeout (5 min)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000);
-
-      const response = await fetch("/api/leads/scrape", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          postUrl: scrapeUrl,
-          maxLikers: 100,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        toast({
-          title: "Scraping complete!",
-          description: `Found ${data.leadsScraped || 0} new leads.`,
-        });
-        setScrapeDialogOpen(false);
-        setScrapeUrl("");
-        fetchData(); // Refresh leads list
-      } else {
-        toast({
-          title: "Scraping failed",
-          description: data.error || "Failed to scrape leads",
-          variant: "destructive",
-        });
-        // Still refresh in case some leads were added
-        fetchData();
-      }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        toast({
-          title: "Scraping timed out",
-          description: "The scrape took too long. Refreshing to check for leads...",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Connection error. Refreshing to check for leads...",
-          variant: "destructive",
-        });
-      }
-      // Refresh anyway - leads may have been added before timeout
-      fetchData();
-    } finally {
-      setScraping(false);
-    }
   };
 
   const handleScrapeLikes = async () => {
@@ -432,73 +367,6 @@ export default function LeadsPage() {
                     <>
                       <Heart className="h-4 w-4 mr-2" />
                       Start Likes Scrape
-                    </>
-                  )}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Scrape from Post Dialog (PhantomBuster) */}
-          <Dialog open={scrapeDialogOpen} onOpenChange={setScrapeDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Sparkles className="h-4 w-4 mr-2" />
-                Legacy Scrape
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Scrape Leads from Post</DialogTitle>
-                <DialogDescription>
-                  Enter an Instagram post URL to scrape users who liked the post.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Instagram Post URL</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="https://instagram.com/p/ABC123..."
-                        className="pl-10"
-                        value={scrapeUrl}
-                        onChange={(e) => setScrapeUrl(e.target.value)}
-                        disabled={scraping}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Supports posts and reels. We&apos;ll scrape up to 100 users who liked this post.
-                  </p>
-                </div>
-                {scraping && (
-                  <div className="bg-muted/50 rounded-lg p-4 flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <div>
-                      <p className="font-medium">Scraping in progress...</p>
-                      <p className="text-sm text-muted-foreground">
-                        This may take 1-3 minutes. Please wait...
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <Button
-                  variant="gradient"
-                  className="w-full"
-                  onClick={handleScrapeLeads}
-                  disabled={!scrapeUrl || scraping}
-                >
-                  {scraping ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Scraping...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Start Scraping
                     </>
                   )}
                 </Button>

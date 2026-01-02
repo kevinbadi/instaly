@@ -13,12 +13,12 @@ import {
   Menu,
   X,
   Instagram,
-  Link as LinkIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import AnimatedShaderBackground from "@/components/ui/animated-shader-background";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -46,6 +46,9 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Shooting Stars Background */}
+      <AnimatedShaderBackground />
+      
       {/* Mobile header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-xl border-b z-50 flex items-center justify-between px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
@@ -73,7 +76,7 @@ export default function DashboardLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-card border-r z-50 transform transition-transform lg:translate-x-0 ${
+        className={`fixed top-0 left-0 h-full w-64 bg-card/80 backdrop-blur-xl border-r border-white/10 z-50 transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -113,7 +116,7 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
           <Button
             variant="ghost"
             className="w-full justify-start text-muted-foreground hover:text-destructive"
@@ -126,7 +129,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main content */}
-      <main className="lg:pl-64 pt-16 lg:pt-0">
+      <main className="lg:pl-64 pt-16 lg:pt-0 relative z-10">
         <div className="p-6 lg:p-8 max-w-7xl mx-auto">{children}</div>
       </main>
     </div>
