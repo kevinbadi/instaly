@@ -7,7 +7,6 @@ import {
   Search,
   Filter,
   Download,
-  Upload,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -72,7 +71,6 @@ export default function LeadsPage() {
   const [dmFilter, setDmFilter] = useState<string>("all");
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
-  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [likesDialogOpen, setLikesDialogOpen] = useState(false);
   const [likesUrl, setLikesUrl] = useState("");
   const [scrapingLikes, setScrapingLikes] = useState(false);
@@ -131,38 +129,6 @@ export default function LeadsPage() {
       title: "Export successful",
       description: `Exported ${leads.length} leads to CSV.`,
     });
-  };
-
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch("/api/leads/import", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        toast({
-          title: "Import successful",
-          description: `Imported ${data.count} leads.`,
-        });
-        fetchData();
-      }
-    } catch (error) {
-      toast({
-        title: "Import failed",
-        description: "Failed to import leads. Please check your file format.",
-        variant: "destructive",
-      });
-    }
-
-    setImportDialogOpen(false);
   };
 
   const handleScrapeLikes = async () => {
@@ -374,31 +340,6 @@ export default function LeadsPage() {
             </DialogContent>
           </Dialog>
 
-          {/* Import CSV Dialog */}
-          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Import
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Import Leads</DialogTitle>
-                <DialogDescription>
-                  Upload a CSV file with leads. Required columns: instagram_username
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <Input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleImportCSV}
-                  className="cursor-pointer"
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-2" />
             Export

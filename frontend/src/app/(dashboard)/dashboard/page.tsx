@@ -16,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { ActivityHeatmap } from "@/components/ui/activity-heatmap";
+import { MonthlyActivityCard } from "@/components/ui/monthly-activity-card";
 import Link from "next/link";
 
 interface DashboardStats {
@@ -44,10 +46,16 @@ interface RecentDm {
   status: string;
 }
 
+interface DayActivity {
+  date: string;
+  count: number;
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [recentDms, setRecentDms] = useState<RecentDm[]>([]);
+  const [messageActivity, setMessageActivity] = useState<DayActivity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -62,6 +70,7 @@ export default function DashboardPage() {
         setStats(data.stats);
         setCampaigns(data.campaigns || []);
         setRecentDms(data.recentDms || []);
+        setMessageActivity(data.messageActivity || []);
       }
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -172,10 +181,29 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* Campaigns and Recent DMs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Active Campaigns */}
-        <Card>
+      {/* Yearly Activity Heatmap - Full Width */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Send className="h-4 w-4 text-emerald-500" />
+              Message Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <ActivityHeatmap data={messageActivity} />
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Active Campaigns + Monthly Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Active Campaigns - Takes 2 columns */}
+        <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Active Campaigns</CardTitle>
             <Link href="/campaigns">
@@ -231,8 +259,19 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent DMs */}
-        <Card>
+        {/* Monthly Activity Card - Square */}
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">This Month</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <MonthlyActivityCard data={messageActivity} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent DMs - Full Width */}
+      <Card>
           <CardHeader>
             <CardTitle>Recent Messages</CardTitle>
           </CardHeader>
@@ -275,7 +314,6 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

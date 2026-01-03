@@ -49,6 +49,31 @@ export async function GET() {
       .order("sent_at", { ascending: false })
       .limit(10);
 
+    // Get activity data for the last year (365 days)
+    // Join through campaigns to filter by user
+    const oneYearAgo = new Date();
+    oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+    
+    const { data: activityData } = await supabase
+      .from("dm_logs")
+      .select("sent_at, campaigns!inner(user_id)")
+      .eq("status", "sent")
+      .eq("campaigns.user_id", dbUser.id)
+      .gte("sent_at", oneYearAgo.toISOString())
+      .order("sent_at", { ascending: true });
+
+    // Aggregate by date
+    const activityMap = new Map<string, number>();
+    (activityData || []).forEach((log: { sent_at: string }) => {
+      const date = log.sent_at.split('T')[0];
+      activityMap.set(date, (activityMap.get(date) || 0) + 1);
+    });
+    
+    const messageActivity = Array.from(activityMap.entries()).map(([date, count]) => ({
+      date,
+      count,
+    }));
+
     // Calculate response rate (placeholder)
     const responseRate = 23;
 
@@ -76,6 +101,7 @@ export async function GET() {
         sent_at: dm.sent_at,
         status: dm.status,
       })),
+      messageActivity,
     });
   } catch (error) {
     console.error("Dashboard error:", error);
