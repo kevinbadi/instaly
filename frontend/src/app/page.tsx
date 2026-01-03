@@ -179,7 +179,7 @@ export default function LandingPage() {
             >
               <Link href="/sign-up">
                 <Button variant="gradient" size="xl" className="group">
-                  Start Free Trial
+                  Get Started
                   <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
@@ -490,7 +490,7 @@ export default function LandingPage() {
               </p>
               <Link href="/sign-up">
                 <Button variant="gradient" size="xl" className="group">
-                  Start Your Free Trial
+                  Get Started
                   <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
