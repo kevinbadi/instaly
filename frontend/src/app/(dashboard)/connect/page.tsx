@@ -636,11 +636,7 @@ export default function ConnectPage() {
                               : "Disabled"}
                           </Badge>
                         </div>
-                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                          <span>
-                            DMs today: {account.dms_sent_today} /{" "}
-                            {account.daily_dm_limit}
-                          </span>
+                        <div className="text-sm text-muted-foreground">
                           <span>
                             Connected:{" "}
                             {new Date(account.created_at).toLocaleDateString()}
