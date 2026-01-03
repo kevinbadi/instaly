@@ -20,6 +20,49 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PRICING_TIERS } from "@/lib/utils";
+import { ActivityHeatmap } from "@/components/ui/activity-heatmap";
+
+// Generate demo data for the landing page activity heatmap
+// Simulates a power user's full year of DM automation
+function generateDemoActivityData() {
+  const data: { date: string; count: number }[] = [];
+  const today = new Date();
+  
+  for (let i = 364; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Create realistic patterns:
+    // - Weekdays have more activity than weekends
+    // - Some random variation
+    // - Occasional "burst" days
+    // - Some low activity periods
+    const dayOfWeek = date.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    
+    // Base activity: weekdays 150-200, weekends 50-100
+    let baseCount = isWeekend 
+      ? Math.floor(Math.random() * 50) + 50 
+      : Math.floor(Math.random() * 50) + 150;
+    
+    // Add some burst days (10% chance for weekdays)
+    if (!isWeekend && Math.random() < 0.1) {
+      baseCount = Math.floor(Math.random() * 50) + 200;
+    }
+    
+    // Add some low activity days (5% chance)
+    if (Math.random() < 0.05) {
+      baseCount = Math.floor(Math.random() * 30) + 10;
+    }
+    
+    data.push({ date: dateStr, count: baseCount });
+  }
+  
+  return data;
+}
+
+const demoActivityData = generateDemoActivityData();
 
 // Dynamic import to avoid SSR issues with THREE.js
 const AnimatedShaderBackground = dynamic(
@@ -206,10 +249,8 @@ export default function LandingPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="h-48 bg-muted/30 rounded-lg border border-border/50 flex items-center justify-center">
-                    <span className="text-muted-foreground">
-                      Campaign Analytics Chart
-                    </span>
+                  <div className="bg-muted/30 rounded-lg border border-border/50 p-4">
+                    <ActivityHeatmap data={demoActivityData} />
                   </div>
                 </div>
               </div>
