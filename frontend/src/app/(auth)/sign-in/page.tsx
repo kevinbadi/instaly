@@ -63,10 +63,14 @@ function SignInForm() {
   };
 
   const handleGoogleSignIn = async () => {
+    // Properly encode the redirectTo parameter to handle special characters
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
+    callbackUrl.searchParams.set("redirectTo", redirectTo);
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirectTo=${redirectTo}`,
+        redirectTo: callbackUrl.toString(),
       },
     });
 

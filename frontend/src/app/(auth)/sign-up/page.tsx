@@ -35,6 +35,10 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
+      // Properly construct the callback URL with redirect to dashboard
+      const callbackUrl = new URL("/auth/callback", window.location.origin);
+      callbackUrl.searchParams.set("redirectTo", "/dashboard");
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -42,7 +46,7 @@ export default function SignUpPage() {
           data: {
             full_name: name,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: callbackUrl.toString(),
         },
       });
 
@@ -72,10 +76,14 @@ export default function SignUpPage() {
   };
 
   const handleGoogleSignUp = async () => {
+    // Properly construct the callback URL with redirect to dashboard
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
+    callbackUrl.searchParams.set("redirectTo", "/dashboard");
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
       },
     });
 
