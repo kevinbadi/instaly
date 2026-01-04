@@ -182,11 +182,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Yearly Activity Heatmap - Full Width */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
         <Card className="overflow-hidden">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -196,9 +196,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-0">
             <ActivityHeatmap data={messageActivity} />
-          </CardContent>
-        </Card>
-      </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
       {/* Active Campaigns + Monthly Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -271,7 +271,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent DMs - Full Width */}
-      <Card>
+        <Card>
           <CardHeader>
             <CardTitle>Recent Messages</CardTitle>
           </CardHeader>

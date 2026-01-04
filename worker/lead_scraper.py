@@ -126,7 +126,8 @@ class InstagramLeadScraper:
                 # Upsert - insert or ignore if exists
                 result = self.supabase.table("leads").upsert(
                     lead_data,
-                    on_conflict="user_id,instagram_username"
+                    on_conflict="user_id,instagram_username",
+                    ignore_duplicates=True  # Skip if lead already exists
                 ).execute()
                 
                 if result.data:
