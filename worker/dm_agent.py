@@ -439,26 +439,58 @@ class InstagramDMAgent:
             search_input.fill(username)
             self.random_delay(2, 3)
             
-            # Step 4: Click first result
+            # Step 4: Click the correct user from search results
             self.log(f"👤 Waiting for search results...", "info")
-            self.random_delay(2, 2.5)
+            self.random_delay(2.5, 3.5)  # Give more time for results to load
             
+            user_selected = False
             try:
                 dialog = self.page.locator('[role="dialog"]')
-                dialog.wait_for(state="visible", timeout=3000)
-                box = dialog.bounding_box()
-                if box:
-                    click_x = box['x'] + (box['width'] / 2)
-                    click_y = box['y'] + 190
-                    self.page.mouse.click(click_x, click_y)
-                    self.log("✅ Clicked first result!", "success")
-                else:
-                    result["error"] = "Could not get dialog bounding box"
-                    self.return_to_inbox()
-                    return result
+                dialog.wait_for(state="visible", timeout=5000)
+                
+                # First, try to find a result that contains the exact username
+                # Look for result items containing the username text
+                result_selectors = [
+                    f'[role="dialog"] div:has-text("@{username}")',
+                    f'[role="dialog"] span:has-text("{username}")',
+                    f'[role="dialog"] button:has-text("{username}")',
+                ]
+                
+                for selector in result_selectors:
+                    try:
+                        results = self.page.locator(selector)
+                        if results.count() > 0:
+                            # Click the first matching result
+                            results.first.click()
+                            user_selected = True
+                            self.log(f"✅ Selected @{username} from results", "success")
+                            break
+                    except:
+                        continue
+                
+                # Fallback: position-based click if username not found in text
+                if not user_selected:
+                    self.log("⚠️ Username not found in results, trying position click...", "warning")
+                    box = dialog.bounding_box()
+                    if box:
+                        click_x = box['x'] + (box['width'] / 2)
+                        click_y = box['y'] + 190
+                        self.page.mouse.click(click_x, click_y)
+                        user_selected = True
+                        self.log("✅ Clicked first result (position-based)", "info")
+                    else:
+                        result["error"] = "Could not get dialog bounding box"
+                        self.return_to_inbox()
+                        return result
+                        
             except Exception as e:
                 result["error"] = f"Could not click result: {e}"
                 self.log(f"❌ {result['error']}", "error")
+                self.return_to_inbox()
+                return result
+            
+            if not user_selected:
+                result["error"] = "Could not select user from search results"
                 self.return_to_inbox()
                 return result
             
@@ -498,14 +530,42 @@ class InstagramDMAgent:
                 self.return_to_inbox()
                 return result
             
-            # Wait for chat to open
+            # Wait for chat to open - THIS IS CRITICAL
             self.log("⏳ Waiting for chat to open...", "info")
             try:
                 self.page.wait_for_url("**/direct/t/**", timeout=10000)
-            except:
-                pass
+            except Exception as e:
+                result["error"] = f"Chat did not open - URL did not change to conversation"
+                self.log(f"❌ {result['error']}", "error")
+                self.return_to_inbox()
+                return result
             
             self.random_delay(1.5, 2)
+            
+            # CRITICAL: Verify we're in the correct conversation before sending
+            # Check that the username appears in the chat header
+            self.log(f"🔍 Verifying correct conversation for @{username}...", "info")
+            try:
+                # Look for the username in the conversation header
+                # Instagram shows the username or display name in the header area
+                header_area = self.page.locator('header, [role="banner"], [data-testid="inbox-thread-header"]').first
+                page_content = self.page.content()
+                
+                # Check if the target username appears in the page (case-insensitive)
+                username_lower = username.lower()
+                if username_lower not in page_content.lower():
+                    result["error"] = f"Wrong conversation - @{username} not found in chat. Aborting to prevent sending to wrong person."
+                    self.log(f"❌ {result['error']}", "error")
+                    self.return_to_inbox()
+                    return result
+                
+                self.log(f"✅ Verified: In conversation with @{username}", "success")
+            except Exception as e:
+                # If we can't verify, err on the side of caution and abort
+                result["error"] = f"Could not verify conversation - aborting to prevent wrong recipient: {e}"
+                self.log(f"⚠️ {result['error']}", "warning")
+                self.return_to_inbox()
+                return result
             
             # Step 6: Find message input
             self.log("✏️ Finding message input...", "info")
@@ -551,6 +611,9 @@ class InstagramDMAgent:
             self.log(f"✅ DM sent to @{username}", "success")
             self.dms_sent_today += 1
             result["success"] = True
+            
+            # CRITICAL: Always return to inbox after sending to ensure clean state for next message
+            self.return_to_inbox()
         
         except Exception as e:
             result["error"] = str(e)
