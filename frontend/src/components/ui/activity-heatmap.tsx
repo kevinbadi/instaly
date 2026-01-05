@@ -150,14 +150,14 @@ export function ActivityHeatmap({ data = [] }: ActivityHeatmapProps) {
 
       <div className="flex">
         {/* Day labels */}
-        <div className="flex flex-col text-[10px] text-zinc-500 pr-2 w-7 shrink-0">
-          <span className="h-[12px]"></span>
+        <div className="flex flex-col text-[10px] text-zinc-500 pr-2 w-7 shrink-0 gap-[2px]">
+          <span className="h-[12px] leading-[12px]">Sun</span>
           <span className="h-[12px] leading-[12px]">Mon</span>
-          <span className="h-[12px]"></span>
+          <span className="h-[12px] leading-[12px]">Tue</span>
           <span className="h-[12px] leading-[12px]">Wed</span>
-          <span className="h-[12px]"></span>
+          <span className="h-[12px] leading-[12px]">Thu</span>
           <span className="h-[12px] leading-[12px]">Fri</span>
-          <span className="h-[12px]"></span>
+          <span className="h-[12px] leading-[12px]">Sat</span>
         </div>
 
         {/* Grid container - fills available width */}
