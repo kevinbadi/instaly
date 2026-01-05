@@ -174,7 +174,9 @@ def personalize_message(template: str, username: str, fullname: str) -> str:
     message = template
     username = clean_username(username)
     fullname = clean_fullname(fullname, username)
+    # Support multiple variable formats
     message = message.replace("{{fullName}}", fullname)
+    message = message.replace("{{name}}", fullname)  # Alias for fullName
     message = message.replace("{{username}}", username)
     return message.strip()
 
@@ -203,7 +205,12 @@ class InstagramDMAgent:
         self.dms_sent_today = 0
         self.headless = headless if headless is not None else HEADLESS
         self.template_name = template
-        self.template = TEMPLATES.get(template, TEMPLATES["default"])
+        # Check if template is a known template name, otherwise use it as custom message
+        if template in TEMPLATES:
+            self.template = TEMPLATES[template]
+        else:
+            # Custom message template - use the string directly
+            self.template = template
         self.limit = limit or MAX_DMS_PER_DAY
         
         # Initialize Supabase

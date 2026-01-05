@@ -321,14 +321,14 @@ export default function CampaignsPage() {
               New Campaign
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Create New Campaign</DialogTitle>
               <DialogDescription>
                 Set up a new Instagram DM automation campaign.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 overflow-y-auto flex-1 pr-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Campaign Name</Label>
                 <Input
@@ -398,8 +398,8 @@ export default function CampaignsPage() {
                 <div className="space-y-2">
                   <Label>Message Template</Label>
                   <Textarea
-                    placeholder="Hey {{name}}! I saw you liked..."
-                    rows={3}
+                    placeholder="Hey {{fullName}}! I saw you liked a post I follow..."
+                    rows={4}
                     value={newCampaign.message_template}
                     onChange={(e) =>
                       setNewCampaign({
@@ -409,7 +409,7 @@ export default function CampaignsPage() {
                     }
                   />
                   <p className="text-xs text-muted-foreground">
-                    Use {"{{name}}"} to personalize with their name
+                    Use <code className="bg-muted px-1 rounded">{"{{fullName}}"}</code> for their display name or <code className="bg-muted px-1 rounded">{"{{username}}"}</code> for their @handle
                   </p>
                 </div>
               )}
