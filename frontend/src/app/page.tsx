@@ -150,7 +150,7 @@ export default function LandingPage() {
                 className="mb-6 px-4 py-2 text-sm border-primary/30"
               >
                 <Sparkles className="h-3.5 w-3.5 mr-2 text-primary" />
-                AI-Powered Instagram Outreach
+                Automated Instagram Outreach
               </Badge>
             </motion.div>
 
@@ -168,8 +168,8 @@ export default function LandingPage() {
               variants={fadeIn}
               className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto"
             >
-              Connect your account, scrape leads from any post, and let our AI send
-              personalized DMs that convert. Send up to 6,000 messages per month on
+              Connect your account, scrape leads from any post, and send
+              personalized DMs that convert. Automate up to 6,000 messages per month on
               autopilot.
             </motion.p>
 
@@ -214,12 +214,13 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="mt-20 relative"
+            className="mt-12 md:mt-20 relative"
           >
             <div className="absolute inset-0 instagram-gradient-bg opacity-20 blur-3xl rounded-3xl" />
-            <div className="relative glass rounded-2xl p-2 glow">
-              <div className="bg-card rounded-xl overflow-hidden border">
-                <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/50">
+            <div className="relative glass rounded-xl md:rounded-2xl p-1 md:p-2 glow">
+              <div className="bg-card rounded-lg md:rounded-xl overflow-hidden border">
+                {/* Browser bar - hidden on mobile */}
+                <div className="hidden md:flex items-center gap-2 px-4 py-3 border-b bg-muted/50">
                   <div className="w-3 h-3 rounded-full bg-red-500" />
                   <div className="w-3 h-3 rounded-full bg-yellow-500" />
                   <div className="w-3 h-3 rounded-full bg-green-500" />
@@ -227,8 +228,9 @@ export default function LandingPage() {
                     dashboard.instaly.io
                   </span>
                 </div>
-                <div className="p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="p-3 md:p-8">
+                  {/* Stats grid - 2 cols on mobile, 4 on desktop */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-4 md:mb-8">
                     {[
                       { label: "DMs Sent Today", value: "187", icon: MessageCircle },
                       { label: "Total Leads", value: "12,453", icon: Users },
@@ -237,20 +239,23 @@ export default function LandingPage() {
                     ].map((stat, i) => (
                       <div
                         key={i}
-                        className="bg-muted/50 rounded-lg p-4 border border-border/50"
+                        className="bg-muted/50 rounded-lg p-2 md:p-4 border border-border/50"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm text-muted-foreground">
+                        <div className="flex items-center justify-between mb-1 md:mb-2">
+                          <span className="text-xs md:text-sm text-muted-foreground">
                             {stat.label}
                           </span>
-                          <stat.icon className="h-4 w-4 text-primary" />
+                          <stat.icon className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                         </div>
-                        <div className="text-2xl font-bold">{stat.value}</div>
+                        <div className="text-lg md:text-2xl font-bold">{stat.value}</div>
                       </div>
                     ))}
                   </div>
-                  <div className="bg-muted/30 rounded-lg border border-border/50 p-4">
-                    <ActivityHeatmap data={demoActivityData} />
+                  {/* Activity heatmap - scrollable on mobile */}
+                  <div className="bg-muted/30 rounded-lg border border-border/50 p-2 md:p-4 overflow-x-auto">
+                    <div className="min-w-[600px] md:min-w-0">
+                      <ActivityHeatmap data={demoActivityData} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -272,7 +277,7 @@ export default function LandingPage() {
               <span className="instagram-gradient">Scale Your Outreach</span>
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              From lead scraping to AI-powered messaging, we&apos;ve got you covered
+              From lead scraping to personalized messaging, we&apos;ve got you covered
               with a complete automation suite.
             </p>
           </div>
@@ -287,9 +292,9 @@ export default function LandingPage() {
               },
               {
                 icon: Sparkles,
-                title: "AI-Powered Messages",
+                title: "Personalized Messages",
                 description:
-                  "Our AI crafts personalized DMs based on each lead's profile, bio, and content.",
+                  "Create custom message templates with dynamic variables to personalize every DM at scale.",
               },
               {
                 icon: Clock,
@@ -486,7 +491,7 @@ export default function LandingPage() {
               </h2>
               <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
                 Join thousands of marketers who are growing their business with
-                automated, AI-powered Instagram DMs.
+                automated, personalized Instagram DMs.
               </p>
               <Link href="/sign-up">
                 <Button variant="gradient" size="xl" className="group">

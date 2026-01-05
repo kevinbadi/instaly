@@ -157,7 +157,10 @@ class CampaignWorker:
         campaign_id = campaign["id"]
         campaign_name = campaign["name"]
         user_id = campaign["user_id"]
-        template = campaign.get("message_template") or "default"
+        template = campaign.get("message_template")
+        if not template:
+            self.log(f"❌ No message template configured for campaign", "error", campaign_name)
+            return False
         dms_per_session = campaign.get("dms_per_session") or DMS_PER_RUN
         
         self.log(f"🚀 Starting campaign processing", "info", campaign_name)
@@ -187,7 +190,7 @@ class CampaignWorker:
             agent = InstagramDMAgent(
                 user_id=user_id,
                 headless=True,  # Run in headless mode
-                template=template if template != "ai" else "ai",
+                template=template,
                 limit=dms_per_session,  # Use campaign's DMs per session setting
                 campaign_id=campaign_id  # Pass campaign filter
             )

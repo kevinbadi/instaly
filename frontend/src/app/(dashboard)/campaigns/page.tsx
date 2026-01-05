@@ -89,7 +89,6 @@ export default function CampaignsPage() {
     instagram_account_id: "",
     message_template: "",
     scrape_urls: "",
-    use_ai: true,
     assign_all_leads: true,
     dms_per_session: 10,
     sessions_per_day: 15,
@@ -138,7 +137,7 @@ export default function CampaignsPage() {
         body: JSON.stringify({
           name: newCampaign.name,
           instagram_account_id: newCampaign.instagram_account_id,
-          message_template: newCampaign.use_ai ? "ai" : newCampaign.message_template,
+          message_template: newCampaign.message_template,
           scrape_urls: newCampaign.scrape_urls
             .split("\n")
             .map((url) => url.trim())
@@ -169,7 +168,6 @@ export default function CampaignsPage() {
           instagram_account_id: "",
           message_template: "",
           scrape_urls: "",
-          use_ai: true,
           assign_all_leads: true,
           dms_per_session: 10,
           sessions_per_day: 15,
@@ -380,39 +378,23 @@ export default function CampaignsPage() {
                   Paste Instagram post URLs, one per line
                 </p>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Use AI Messages</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Generate personalized messages with AI
-                  </p>
-                </div>
-                <Switch
-                  checked={newCampaign.use_ai}
-                  onCheckedChange={(checked) =>
-                    setNewCampaign({ ...newCampaign, use_ai: checked })
+              <div className="space-y-2">
+                <Label>Message Template</Label>
+                <Textarea
+                  placeholder="Hey {{fullName}}! I saw you liked a post I follow..."
+                  rows={4}
+                  value={newCampaign.message_template}
+                  onChange={(e) =>
+                    setNewCampaign({
+                      ...newCampaign,
+                      message_template: e.target.value,
+                    })
                   }
                 />
+                <p className="text-xs text-muted-foreground">
+                  Use <code className="bg-muted px-1 rounded">{"{{fullName}}"}</code> for their display name or <code className="bg-muted px-1 rounded">{"{{username}}"}</code> for their @handle
+                </p>
               </div>
-              {!newCampaign.use_ai && (
-                <div className="space-y-2">
-                  <Label>Message Template</Label>
-                  <Textarea
-                    placeholder="Hey {{fullName}}! I saw you liked a post I follow..."
-                    rows={4}
-                    value={newCampaign.message_template}
-                    onChange={(e) =>
-                      setNewCampaign({
-                        ...newCampaign,
-                        message_template: e.target.value,
-                      })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Use <code className="bg-muted px-1 rounded">{"{{fullName}}"}</code> for their display name or <code className="bg-muted px-1 rounded">{"{{username}}"}</code> for their @handle
-                  </p>
-                </div>
-              )}
               
               {/* Schedule Section */}
               <div className="border-t pt-4 space-y-4">
@@ -515,7 +497,7 @@ export default function CampaignsPage() {
               <Button
                 variant="gradient"
                 onClick={handleCreateCampaign}
-                disabled={!newCampaign.name || !newCampaign.instagram_account_id}
+                disabled={!newCampaign.name || !newCampaign.instagram_account_id || !newCampaign.message_template}
               >
                 Create Campaign
               </Button>

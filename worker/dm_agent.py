@@ -4,10 +4,10 @@ Instagram DM Agent - Supabase + Steel.dev Session Based
 
 Sends personalized DMs to leads stored in Supabase.
 Uses captured Instagram sessions from Steel.dev (no login required).
+All campaigns use custom message templates written by users.
 
 Usage:
     python dm_agent.py --user-id <uuid> --limit 10
-    python dm_agent.py --user-id <uuid> --template ai
     python dm_agent.py --user-id <uuid> --test
     python dm_agent.py --user-id <uuid> --stats
 """
@@ -48,17 +48,9 @@ except ImportError:
     print("❌ Supabase not installed. Run: pip install supabase")
     exit(1)
 
-# Anthropic for AI messages
-try:
-    import anthropic
-    ANTHROPIC_AVAILABLE = True
-except ImportError:
-    ANTHROPIC_AVAILABLE = False
-
 # Configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # Rate Limiting
 DELAY_BETWEEN_DMS = int(os.getenv("DELAY_BETWEEN_DMS", "60"))
@@ -75,79 +67,10 @@ INSTAGRAM_BASE_URL = "https://www.instagram.com"
 INSTAGRAM_DM_URL = f"{INSTAGRAM_BASE_URL}/direct/inbox/"
 
 # ============================================================
-# MESSAGE TEMPLATES
+# MESSAGE PERSONALIZATION
 # ============================================================
-TEMPLATES = {
-    "default": """Hey {{fullName}}!
-
-I noticed you engaged with some content I follow. 
-
-Quick question - are you open to growing your Instagram faster with AI-powered automation?
-
-We built something that sends personalized DMs at scale.
-
-Reply "yes" if interested!""",
-
-    "short": """{{fullName}} –
-
-Built an Instagram growth tool.
-Automated DMs. Personalized. Scales infinitely.
-
-Want to see it?""",
-
-    "bold": """{{fullName}} –
-
-We send 1,000+ personalized Instagram DMs per day.
-Zero manual work.
-
-If you want in, reply "show me".""",
-
-    "ai": "AI_GENERATED",
-}
-
-# ============================================================
-# AI MESSAGE GENERATION
-# ============================================================
-AI_SYSTEM_PROMPT = """You are an expert cold DM copywriter. Write short, personalized Instagram DMs that get replies.
-
-Rules:
-1. Keep it under 80 words - Instagram DMs should be brief
-2. Start with their name
-3. Be conversational and friendly
-4. Pitch an Instagram growth/automation tool
-5. End with a simple CTA
-6. NO hashtags, minimal emojis (1-2 max)
-7. Sound human, not robotic
-
-Output ONLY the message text. No explanations."""
-
-
-def generate_ai_message(lead_data: Dict) -> Optional[str]:
-    """Generate a personalized DM using Claude AI"""
-    if not ANTHROPIC_AVAILABLE or not ANTHROPIC_API_KEY:
-        return None
-    
-    username = lead_data.get("username", "")
-    full_name = lead_data.get("full_name", "")
-    
-    user_prompt = f"""Write a personalized cold DM for this Instagram lead:
-Username: @{username}
-Name: {full_name if full_name else "Unknown"}
-
-Write a compelling, personalized DM that will get them to reply."""
-
-    try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=200,
-            system=AI_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}]
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        print(f"{Fore.RED}❌ AI generation error: {e}{Style.RESET_ALL}")
-        return None
+# All users write their own custom message templates
+# Supported variables: {{fullName}}, {{name}}, {{username}}
 
 
 def clean_username(username: str) -> str:
@@ -204,13 +127,8 @@ class InstagramDMAgent:
         self.page: Optional[Page] = None
         self.dms_sent_today = 0
         self.headless = headless if headless is not None else HEADLESS
-        self.template_name = template
-        # Check if template is a known template name, otherwise use it as custom message
-        if template in TEMPLATES:
-            self.template = TEMPLATES[template]
-        else:
-            # Custom message template - use the string directly
-            self.template = template
+        # All campaigns use custom message templates
+        self.template = template
         self.limit = limit or MAX_DMS_PER_DAY
         
         # Initialize Supabase
@@ -645,28 +563,13 @@ class InstagramDMAgent:
             result = query.limit(self.limit).execute()
             
             leads = []
-            use_ai = self.template_name == "ai"
-            
-            if use_ai:
-                self.log("🤖 Using AI-powered message generation...", "info")
             
             for row in result.data:
                 username = row.get("instagram_username", "")
                 full_name = row.get("full_name", "")
                 
-                lead_data = {
-                    "id": row.get("id"),
-                    "username": username,
-                    "full_name": full_name,
-                }
-                
-                if use_ai:
-                    self.log(f"🤖 Generating AI message for @{username}...", "info")
-                    message = generate_ai_message(lead_data)
-                    if not message:
-                        message = personalize_message(TEMPLATES["default"], username, full_name)
-                else:
-                    message = personalize_message(self.template, username, full_name)
+                # Personalize the custom message template
+                message = personalize_message(self.template, username, full_name)
                 
                 leads.append({
                     "id": row.get("id"),
@@ -757,7 +660,8 @@ class InstagramDMAgent:
         print(f"   User ID: {self.user_id[:8]}...")
         if self.campaign_id:
             print(f"   Campaign: {self.campaign_id[:8]}...")
-        print(f"   Template: {self.template_name}")
+        template_preview = self.template[:50] + "..." if len(self.template) > 50 else self.template
+        print(f"   Template: {template_preview}")
         print(f"   Limit: {self.limit} DMs")
         print(f"   Delay between DMs: {DELAY_BETWEEN_DMS}s")
         print(f"   Headless: {self.headless}")
@@ -874,8 +778,8 @@ def main():
                         help="Campaign ID to filter leads (optional)")
     parser.add_argument("--headless", action="store_true",
                         help="Run in headless mode")
-    parser.add_argument("--template", "-t", choices=list(TEMPLATES.keys()), default="default",
-                        help="Message template to use")
+    parser.add_argument("--template", "-t", type=str, required=True,
+                        help="Custom message template (use {{fullName}} and {{username}} for personalization)")
     parser.add_argument("--limit", "-l", type=int, default=None,
                         help="Maximum DMs to send")
     parser.add_argument("--test", action="store_true",
