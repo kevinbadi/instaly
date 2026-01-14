@@ -47,6 +47,7 @@ POLL_INTERVAL = int(os.getenv("WORKER_POLL_INTERVAL", "60"))  # seconds
 DMS_PER_RUN = int(os.getenv("WORKER_DMS_PER_RUN", "10"))  # DMs per campaign run
 COOLDOWN_MINUTES = int(os.getenv("WORKER_COOLDOWN_MINUTES", "30"))  # Minutes between runs
 MAX_PARALLEL_CAMPAIGNS = int(os.getenv("MAX_PARALLEL_CAMPAIGNS", "5"))  # Max concurrent campaigns
+DAILY_DM_LIMIT = int(os.getenv("DAILY_DM_LIMIT", "150"))  # Instagram's daily DM limit per account
 
 
 class CampaignWorker:
@@ -77,6 +78,57 @@ class CampaignWorker:
         color = colors.get(level, Fore.WHITE)
         prefix = f"[{campaign_name}] " if campaign_name else ""
         print(f"{Fore.WHITE}[{timestamp}] {color}{prefix}{message}{Style.RESET_ALL}")
+    
+    def get_account_dms_last_24h(self, instagram_account_id: str) -> int:
+        """
+        Get the number of DMs sent from an Instagram account in the last 24 hours.
+        This is used to enforce Instagram's daily DM limit (~200/day).
+        """
+        try:
+            # Query dm_logs for this account in the last 24 hours
+            # Need to join through campaigns to get instagram_account_id
+            result = self.supabase.rpc(
+                'count_dms_last_24h',
+                {'account_id': instagram_account_id}
+            ).execute()
+            
+            if result.data is not None:
+                return result.data
+            
+            # Fallback: direct query if RPC doesn't exist
+            twenty_four_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+            result = self.supabase.table("dm_logs").select(
+                "id", count="exact"
+            ).eq("instagram_account_id", instagram_account_id).gte("sent_at", twenty_four_hours_ago).execute()
+            
+            return result.count or 0
+        except Exception as e:
+            # If query fails, try alternative approach through campaigns
+            try:
+                twenty_four_hours_ago = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+                
+                # Get all campaigns for this account
+                campaigns_result = self.supabase.table("campaigns").select(
+                    "id"
+                ).eq("instagram_account_id", instagram_account_id).execute()
+                
+                if not campaigns_result.data:
+                    return 0
+                
+                campaign_ids = [c["id"] for c in campaigns_result.data]
+                
+                # Count DMs for these campaigns
+                total = 0
+                for cid in campaign_ids:
+                    dm_result = self.supabase.table("dm_logs").select(
+                        "id", count="exact"
+                    ).eq("campaign_id", cid).gte("sent_at", twenty_four_hours_ago).execute()
+                    total += dm_result.count or 0
+                
+                return total
+            except Exception as e2:
+                self.log(f"⚠️ Could not check daily DM count: {e2}", "warning")
+                return 0  # Assume 0 if we can't check (fail open)
     
     def get_active_campaigns(self) -> List[Dict]:
         """
@@ -123,6 +175,21 @@ class CampaignWorker:
                     except Exception as parse_err:
                         self.log(f"   ⚠️ Could not parse next_run_at '{next_run}': {parse_err}", "warning")
                 
+                # Check if Instagram account has hit daily DM limit (200/day)
+                instagram_account_id = campaign.get("instagram_account_id")
+                instagram_username = campaign.get('instagram_accounts', {}).get('instagram_username', 'Unknown')
+                remaining_dms = DAILY_DM_LIMIT  # Default
+                
+                if instagram_account_id:
+                    dms_last_24h = self.get_account_dms_last_24h(instagram_account_id)
+                    remaining_dms = DAILY_DM_LIMIT - dms_last_24h
+                    
+                    if dms_last_24h >= DAILY_DM_LIMIT:
+                        self.log(f"   🚫 Account @{instagram_username} hit daily limit ({dms_last_24h}/{DAILY_DM_LIMIT} DMs in 24h)", "warning")
+                        continue
+                    elif remaining_dms < 20:
+                        self.log(f"   ⚠️ Account @{instagram_username} near limit ({dms_last_24h}/{DAILY_DM_LIMIT} DMs, {remaining_dms} remaining)", "warning")
+                
                 # Check if campaign has pending leads
                 leads_result = self.supabase.table("leads").select(
                     "id", count="exact"
@@ -139,8 +206,9 @@ class CampaignWorker:
                     continue
                 
                 campaign["pending_leads"] = pending_leads
+                campaign["dms_remaining_today"] = remaining_dms if instagram_account_id else DAILY_DM_LIMIT
                 ready_campaigns.append(campaign)
-                self.log(f"   ✅ Campaign '{campaign['name']}' ready ({pending_leads} leads)", "success")
+                self.log(f"   ✅ Campaign '{campaign['name']}' ready ({pending_leads} leads, {campaign['dms_remaining_today']} DMs remaining today)", "success")
             
             return ready_campaigns
         
@@ -161,7 +229,14 @@ class CampaignWorker:
         if not template:
             self.log(f"❌ No message template configured for campaign", "error", campaign_name)
             return False
-        dms_per_session = campaign.get("dms_per_session") or DMS_PER_RUN
+        
+        # Respect daily DM limit - don't send more than remaining allowance
+        dms_remaining_today = campaign.get("dms_remaining_today", DAILY_DM_LIMIT)
+        dms_per_session = min(campaign.get("dms_per_session") or DMS_PER_RUN, dms_remaining_today)
+        
+        if dms_per_session <= 0:
+            self.log(f"🚫 Daily DM limit reached for this account", "warning", campaign_name)
+            return False
         
         self.log(f"🚀 Starting campaign processing", "info", campaign_name)
         self.log(f"   User: {campaign.get('users', {}).get('email', 'Unknown')}", "info", campaign_name)
@@ -189,7 +264,7 @@ class CampaignWorker:
             # Create and run DM agent for this campaign
             agent = InstagramDMAgent(
                 user_id=user_id,
-                headless=True,  # Run in headless mode
+                headless=True,  # DEBUG: Show browser to diagnose issues
                 template=template,
                 limit=dms_per_session,  # Use campaign's DMs per session setting
                 campaign_id=campaign_id  # Pass campaign filter

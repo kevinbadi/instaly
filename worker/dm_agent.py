@@ -53,7 +53,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Rate Limiting
-DELAY_BETWEEN_DMS = int(os.getenv("DELAY_BETWEEN_DMS", "60"))
+DELAY_BETWEEN_DMS = int(os.getenv("DELAY_BETWEEN_DMS", "60"))  # 60 seconds
 DELAY_BETWEEN_BATCHES = int(os.getenv("DELAY_BETWEEN_BATCHES", "300"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "10"))
 MAX_DMS_PER_DAY = int(os.getenv("MAX_DMS_PER_DAY", "50"))
@@ -528,10 +528,99 @@ class InstagramDMAgent:
             message_input.fill(message)
             self.random_delay(1, 1.5)
             
-            self.log("📤 Sending with Enter key...", "info")
+            # Try clicking Send button first, fallback to Enter key
+            self.log("📤 Sending message...", "info")
+            send_clicked = False
+            
+            # Try to find and click the Send button
+            send_selectors = [
+                'div[role="button"] svg[aria-label="Send"]',
+                'svg[aria-label="Send"]',
+                '[aria-label="Send"]',
+                'button[type="submit"]',
+            ]
+            
+            for selector in send_selectors:
+                try:
+                    send_btn = self.page.locator(selector).first
+                    if send_btn.count() > 0 and send_btn.is_visible():
+                        send_btn.click()
+                        send_clicked = True
+                        self.log("✅ Clicked Send button", "success")
+                        break
+                except:
+                    continue
+            
+            # Fallback to Enter key if no send button found
+            if not send_clicked:
+                self.log("⚠️ No Send button found, using Enter key...", "warning")
             message_input.press("Enter")
             
-            self.random_delay(2, 3)
+            # Wait for message to be processed by Instagram
+            self.log("⏳ Waiting 3s for Instagram to process message...", "info")
+            time.sleep(3)
+            
+            # Additional wait to catch delayed block notifications
+            self.log("⏳ Waiting 3s more to check for blocks...", "info")
+            time.sleep(3)
+            
+            # Check for visible error elements via selectors (more reliable than text search)
+            self.log("🔍 Checking for send errors and blocks...", "info")
+            error_selectors = [
+                'svg[aria-label="Error"]',
+                'svg[aria-label="Retry"]',
+                '[aria-label="Not delivered"]',
+                '[aria-label="Message not sent"]',
+                'svg[aria-label="Warning"]',
+            ]
+            
+            error_found = False
+            error_message = None
+            
+            # Check selector-based errors
+            for selector in error_selectors:
+                try:
+                    error_elem = self.page.locator(selector)
+                    if error_elem.count() > 0 and error_elem.first.is_visible():
+                        error_found = True
+                        error_message = f"Instagram showed error indicator ({selector})"
+                        break
+                except:
+                    continue
+            
+            # Check for text-based block/error messages in page content
+            if not error_found:
+                try:
+                    page_text = self.page.content().lower()
+                    block_phrases = [
+                        "message couldn't be sent",
+                        "couldn't send message",
+                        "can't send messages",
+                        "try again later",
+                        "temporarily blocked",
+                        "action blocked",
+                        "limit reached",
+                        "too many messages",
+                        "this account can't receive",
+                        "unable to send",
+                        "message failed",
+                    ]
+                    for phrase in block_phrases:
+                        if phrase in page_text:
+                            error_found = True
+                            error_message = f"Instagram block detected: '{phrase}'"
+                            break
+                except:
+                    pass
+            
+            if error_found:
+                result["error"] = error_message or "Instagram showed error indicator - message may not have delivered"
+                self.log(f"🚫 {result['error']}", "error")
+                result["success"] = False
+                self.return_to_inbox()
+                return result
+            
+            self.log(f"✅ No error indicators found - message appears delivered", "success")
             
             self.log(f"✅ DM sent to @{username}", "success")
             self.dms_sent_today += 1
@@ -730,10 +819,10 @@ class InstagramDMAgent:
                         error=result.get("error")
                     )
                     
-                    if result["success"]:
-                        delay = DELAY_BETWEEN_DMS + random.randint(-10, 30)
-                        self.log(f"⏳ Waiting {delay}s before next DM...", "info")
-                        time.sleep(delay)
+                    # ALWAYS wait between DMs (success or fail) to appear human
+                    delay = DELAY_BETWEEN_DMS + random.randint(0, 45)  # 90-135 seconds
+                    self.log(f"⏳ Waiting {delay}s before next DM (human pacing)...", "info")
+                    time.sleep(delay)
                 
                 if i + BATCH_SIZE < len(leads):
                     delay = DELAY_BETWEEN_BATCHES + random.randint(-30, 60)

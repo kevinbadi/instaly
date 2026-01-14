@@ -378,23 +378,23 @@ export default function CampaignsPage() {
                   Paste Instagram post URLs, one per line
                 </p>
               </div>
-              <div className="space-y-2">
-                <Label>Message Template</Label>
-                <Textarea
+                <div className="space-y-2">
+                  <Label>Message Template</Label>
+                  <Textarea
                   placeholder="Hey {{fullName}}! I saw you liked a post I follow..."
                   rows={4}
-                  value={newCampaign.message_template}
-                  onChange={(e) =>
-                    setNewCampaign({
-                      ...newCampaign,
-                      message_template: e.target.value,
-                    })
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
+                    value={newCampaign.message_template}
+                    onChange={(e) =>
+                      setNewCampaign({
+                        ...newCampaign,
+                        message_template: e.target.value,
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
                   Use <code className="bg-muted px-1 rounded">{"{{fullName}}"}</code> for their display name or <code className="bg-muted px-1 rounded">{"{{username}}"}</code> for their @handle
-                </p>
-              </div>
+                  </p>
+                </div>
               
               {/* Schedule Section */}
               <div className="border-t pt-4 space-y-4">

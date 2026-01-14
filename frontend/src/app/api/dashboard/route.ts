@@ -50,15 +50,15 @@ export async function GET() {
       .limit(10);
 
     // Get activity data for the last year (365 days)
-    // Join through campaigns to filter by user
+    // Use direct user_id for reliable history even if campaigns are deleted
     const oneYearAgo = new Date();
     oneYearAgo.setDate(oneYearAgo.getDate() - 365);
     
     const { data: activityData } = await supabase
       .from("dm_logs")
-      .select("sent_at, campaigns!inner(user_id)")
+      .select("sent_at")
       .eq("status", "sent")
-      .eq("campaigns.user_id", dbUser.id)
+      .eq("user_id", dbUser.id)
       .gte("sent_at", oneYearAgo.toISOString())
       .order("sent_at", { ascending: true });
 
