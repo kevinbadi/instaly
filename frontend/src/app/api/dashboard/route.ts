@@ -55,17 +55,18 @@ export async function GET() {
     oneYearAgo.setDate(oneYearAgo.getDate() - 365);
     
     const { data: activityData } = await supabase
-      .from("dm_logs")
-      .select("sent_at")
-      .eq("status", "sent")
+      .from("leads")
+      .select("dm_sent_at")
       .eq("user_id", dbUser.id)
-      .gte("sent_at", oneYearAgo.toISOString())
-      .order("sent_at", { ascending: true });
+      .eq("dm_sent", true)
+      .gte("dm_sent_at", oneYearAgo.toISOString())
+      .order("dm_sent_at", { ascending: true });
 
     // Aggregate by date
     const activityMap = new Map<string, number>();
-    (activityData || []).forEach((log: { sent_at: string }) => {
-      const date = log.sent_at.split('T')[0];
+    (activityData || []).forEach((lead: { dm_sent_at: string | null }) => {
+      if (!lead.dm_sent_at) return;
+      const date = lead.dm_sent_at.split("T")[0];
       activityMap.set(date, (activityMap.get(date) || 0) + 1);
     });
     
