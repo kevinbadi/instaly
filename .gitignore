@@ -53,5 +53,3 @@ worker/logs/
 
 # Launch Agent (contains secrets)
 *.plist
-
-README.md
